@@ -60,7 +60,7 @@ const Layout = ({ children, user, isAdmin }) => {
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="text-center">
             <h1 className="text-xl font-bold tracking-tight">
-              FORÇA TÁTICA - PMESP
+              FORÇA TÁTICA
             </h1>
             <p className="text-blue-300 text-xs font-semibold tracking-wider mt-1">
               Sistema de Comunicados Operacionais
