@@ -59,9 +59,8 @@ const FardaImage = ({ farda, size = 'medium' }) => {
             style={{
               width: '100%',
               height: '100%',
-              objectFit: 'contain',
-              transform: 'scale(1.2)',
-              transformOrigin: 'center',
+              objectFit: 'cover',
+              objectPosition: 'center',
             }}
             className="transition-transform duration-300 hover:scale-105"
             onError={(e) => {
