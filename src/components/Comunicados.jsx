@@ -61,6 +61,24 @@ const Comunicados = ({ isAdmin }) => {
     });
   }, [isAdmin]);
 
+  // ESC para fechar modal
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === 'Escape' && isModalOpen) {
+        setModalOpen(false);
+        setEditingCom(null);
+        setFormData({
+          titulo: '',
+          tipo: 'INFORMATIVO',
+          conteudo: '',
+        });
+      }
+    };
+
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+}, [isModalOpen]);
+
   const toggleComExpand = (id) => {
     setExpandedComId(expandedComId === id ? null : id);
   };
