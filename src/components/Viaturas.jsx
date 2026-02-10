@@ -225,12 +225,12 @@ export const Viaturas = ({ isAdmin }) => {
             key={vtr.id}
             className="bg-gray-800/50 border border-blue-500/20 rounded-xl overflow-hidden hover:border-blue-500/40 transition group fade-in"
           >
-            <div className="h-48 overflow-hidden bg-gray-900">
+            <div className="h-80 overflow-hidden bg-gray-900">
               {vtr.fotoURL ? (
                 <img
                   src={vtr.fotoURL}
                   alt={vtr.nome}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 image-preview"
+                  className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300 image-preview"
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-900/30 to-gray-900">
