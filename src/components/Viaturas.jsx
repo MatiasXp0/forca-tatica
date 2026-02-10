@@ -225,7 +225,7 @@ export const Viaturas = ({ isAdmin }) => {
             key={vtr.id}
             className="bg-gray-800/50 border border-blue-500/20 rounded-xl overflow-hidden hover:border-blue-500/40 transition group fade-in"
           >
-            <div className="h-80 overflow-hidden bg-gray-900">
+            <div className="h-50 overflow-hidden bg-gray-900">
               {vtr.fotoURL ? (
                 <img
                   src={vtr.fotoURL}
