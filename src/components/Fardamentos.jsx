@@ -1226,6 +1226,6 @@ const Fardamentos = ({ isAdmin }) => {
       )}
     </div>
   );
-;
+};
 
 export default Fardamentos;
