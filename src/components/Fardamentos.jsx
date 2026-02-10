@@ -104,6 +104,7 @@ const Fardamentos = ({ isAdmin }) => {
   const [fardamentos, setFardamentos] = useState([]);
   const [selectedFarda, setSelectedFarda] = useState(null);
   const [isModalOpen, setModalOpen] = useState(false);
+  const [isViewModalOpen, setViewModalOpen] = useState(false);
   const [editingFarda, setEditingFarda] = useState(null);
   const [formData, setFormData] = useState({
     nome: '',
@@ -287,6 +288,8 @@ const Fardamentos = ({ isAdmin }) => {
 
   const handleViewFarda = (farda) => {
     setSelectedFarda(farda);
+    setViewModalOpen(true);
+  };
   };
 
   return (
@@ -1007,8 +1010,222 @@ const Fardamentos = ({ isAdmin }) => {
           </div>
         </div>
       )}
+
+      {/* Modal de Visualização Tela Cheia - Guarda Roupa */}
+      {isViewModalOpen && selectedFarda && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4 modal-overlay">
+          <div className="bg-gray-800 border border-blue-500/30 rounded-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col fade-in">
+            {/* Header */}
+            <div className="flex justify-between items-center p-8 border-b border-gray-700/50 bg-gradient-to-r from-gray-800/80 to-gray-900/50 sticky top-0">
+              <div className="flex-1">
+                <h2 className="text-3xl font-bold text-white mb-2">
+                  {selectedFarda.nome}
+                </h2>
+                <p className="text-gray-400">
+                  {selectedFarda.pecas?.length || 0} peças do uniforme
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setViewModalOpen(false);
+                  setSelectedFarda(null);
+                }}
+                className="p-3 hover:bg-gray-700 rounded-lg transition text-gray-400 hover:text-white"
+              >
+                <X size={28} />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-8">
+              {/* Info Section */}
+              {selectedFarda.fotoURL && (
+                <div className="mb-8 bg-gray-900/50 rounded-xl p-6 border border-blue-500/20">
+                  <div className="flex gap-8 items-start">
+                    <div className="flex-shrink-0">
+                      <img
+                        src={selectedFarda.fotoURL}
+                        alt={selectedFarda.nome}
+                        className="max-w-xs h-auto rounded-lg object-contain"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      {selectedFarda.descricao && (
+                        <div className="mb-6">
+                          <h3 className="text-lg font-semibold text-blue-400 mb-3">
+                            Descrição
+                          </h3>
+                          <p className="text-gray-300">{selectedFarda.descricao}</p>
+                        </div>
+                      )}
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="bg-blue-500/20 rounded-lg p-4 border border-blue-500/30">
+                          <div className="text-3xl font-bold text-blue-400">
+                            {selectedFarda.pecas?.length || 0}
+                          </div>
+                          <div className="text-sm text-gray-400 mt-1">Total de Peças</div>
+                        </div>
+                        <div className="bg-green-500/20 rounded-lg p-4 border border-green-500/30">
+                          <div className="text-3xl font-bold text-green-400">
+                            {selectedFarda.createdAt?.toDate
+                              ? new Date(
+                                  selectedFarda.createdAt.toDate()
+                                ).toLocaleDateString('pt-BR')
+                              : 'N/A'}
+                          </div>
+                          <div className="text-sm text-gray-400 mt-1">Data de Cadastro</div>
+                        </div>
+                        <div className="bg-purple-500/20 rounded-lg p-4 border border-purple-500/30">
+                          <div className="text-3xl font-bold text-purple-400">
+                            {getFardaColor(selectedFarda.nome).badge}
+                          </div>
+                          <div className="text-sm text-gray-400 mt-1">Categoria</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Peças Grid */}
+              <div>
+                <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+                  <div className="p-3 rounded-lg bg-blue-500/20 border border-blue-500/30">
+                    <Shirt size={24} className="text-blue-400" />
+                  </div>
+                  Composição do Uniforme
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {selectedFarda.pecas && selectedFarda.pecas.length > 0 ? (
+                    selectedFarda.pecas.map((peca, index) => {
+                      if (typeof peca === 'string') {
+                        const partes = peca.split('|').map((p) => p.trim());
+                        const nomePeca = partes[0] || '';
+                        const detalhes = partes.slice(1).join(' | ');
+
+                        return (
+                          <div
+                            key={index}
+                            className="bg-gradient-to-br from-gray-800/50 to-gray-900/30 rounded-xl p-6 border border-blue-500/20 hover:border-blue-500/40 transition-all group hover:shadow-lg hover:shadow-blue-500/10"
+                          >
+                            <div className="flex items-center gap-4 mb-4">
+                              <div className="w-12 h-12 rounded-lg bg-blue-500/30 border border-blue-500/50 flex items-center justify-center flex-shrink-0 group-hover:bg-blue-500/40 transition">
+                                <span className="text-lg font-bold text-blue-300">
+                                  {index + 1}
+                                </span>
+                              </div>
+                              <h4 className="font-bold text-lg text-white group-hover:text-blue-300 transition">
+                                {nomePeca}
+                              </h4>
+                            </div>
+                            {detalhes && (
+                              <div className="bg-gray-900/50 rounded-lg p-4 border-l-4 border-blue-500/50">
+                                {detalhes.split('|').map((item, i) => (
+                                  <div key={i} className="text-sm text-gray-300 mb-2 last:mb-0">
+                                    • {item.trim()}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      } else {
+                        const tipoFormatado = peca.tipo ? peca.tipo.toUpperCase() : '';
+                        const numero = peca.numero || '';
+                        const textura = peca.textura ? ` | TXT ${peca.textura}` : '';
+                        const descricao = peca.descricao || '';
+
+                        return (
+                          <div
+                            key={index}
+                            className="bg-gradient-to-br from-gray-800/50 to-gray-900/30 rounded-xl p-6 border border-blue-500/20 hover:border-blue-500/40 transition-all group hover:shadow-lg hover:shadow-blue-500/10"
+                          >
+                            <div className="flex items-center gap-4 mb-4">
+                              <div className="w-12 h-12 rounded-lg bg-blue-500/30 border border-blue-500/50 flex items-center justify-center flex-shrink-0 group-hover:bg-blue-500/40 transition">
+                                <span className="text-lg font-bold text-blue-300">
+                                  {index + 1}
+                                </span>
+                              </div>
+                              <div className="flex-1">
+                                <h4 className="font-bold text-lg text-white group-hover:text-blue-300 transition">
+                                  {tipoFormatado}
+                                </h4>
+                                <p className="text-sm text-gray-400">
+                                  {numero}
+                                  {textura}
+                                </p>
+                              </div>
+                            </div>
+                            {descricao && (
+                              <div className="bg-gray-900/50 rounded-lg p-4 border-l-4 border-blue-500/50">
+                                <p className="text-sm text-gray-300">{descricao}</p>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }
+                    })
+                  ) : (
+                    <div className="col-span-full text-center py-12 border-2 border-dashed border-gray-700 rounded-lg">
+                      <Shirt size={48} className="mx-auto text-gray-600 mb-4" />
+                      <p className="text-gray-400 text-lg">
+                        Nenhuma peça cadastrada para este fardamento
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            {isAdmin && (
+              <div className="flex gap-3 p-8 border-t border-gray-700/50 bg-gradient-to-r from-gray-900/80 to-gray-800/50 sticky bottom-0">
+                <button
+                  onClick={() => {
+                    handleEditFarda(selectedFarda);
+                    setViewModalOpen(false);
+                  }}
+                  className="flex-1 bg-yellow-600/20 hover:bg-yellow-600/30 text-yellow-400 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition-all border border-yellow-500/30 hover:border-yellow-500/50"
+                >
+                  <Edit size={18} /> Editar Fardamento
+                </button>
+                <button
+                  onClick={() => handleDeleteFarda(selectedFarda.id)}
+                  className="flex-1 bg-red-600/20 hover:bg-red-600/30 text-red-400 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition-all border border-red-500/30 hover:border-red-500/50"
+                >
+                  <Trash2 size={18} /> Excluir Fardamento
+                </button>
+                <button
+                  onClick={() => {
+                    setViewModalOpen(false);
+                    setSelectedFarda(null);
+                  }}
+                  className="flex-1 bg-gray-700 hover:bg-gray-600 py-3 rounded-lg font-semibold text-gray-100 transition-all"
+                >
+                  Fechar
+                </button>
+              </div>
+            )}
+
+            {!isAdmin && (
+              <div className="flex justify-end p-8 border-t border-gray-700/50 bg-gradient-to-r from-gray-900/80 to-gray-800/50">
+                <button
+                  onClick={() => {
+                    setViewModalOpen(false);
+                    setSelectedFarda(null);
+                  }}
+                  className="px-8 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg font-semibold text-gray-100 transition-all"
+                >
+                  Fechar
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
-};
+;
 
 export default Fardamentos;
