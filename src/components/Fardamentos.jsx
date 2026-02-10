@@ -27,17 +27,28 @@ const FardaImage = ({ farda, size = 'medium' }) => {
   const iconSize = sizes[size].icon;
 
   return (
-    <>
+    <div
+      style={{
+        width: containerSize,
+        height: containerSize,
+        borderRadius: '12px',
+        position: 'relative',
+        flexShrink: 0,
+        background: 'transparent',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
       {farda.fotoURL ? (
         <img
           src={farda.fotoURL}
           alt={farda.nome}
           style={{
-            maxWidth: containerSize,
-            maxHeight: containerSize,
+            width: '100%',
+            height: '100%',
             objectFit: 'contain',
             borderRadius: '12px',
-            flexShrink: 0,
           }}
           className="transition-transform duration-300 hover:scale-105"
           onError={(e) => {
@@ -45,7 +56,7 @@ const FardaImage = ({ farda, size = 'medium' }) => {
             const parent = e.target.parentElement;
             if (parent) {
               parent.innerHTML = `
-              <div style="width:${containerSize};height:${containerSize};display:flex;align-items:center;justify-content:center;background:rgba(31,41,55,0.5);border-radius:12px;">
+              <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:rgba(31,41,55,0.5);border-radius:12px;">
                 <div style="text-align:center">
                   <Shirt size="${iconSize}" style="color:rgba(255,255,255,0.6)" />
                   <div style="color:rgba(255,255,255,0.5);font-size:12px;margin-top:6px;font-weight:600">${
@@ -60,14 +71,13 @@ const FardaImage = ({ farda, size = 'medium' }) => {
       ) : (
         <div
           style={{
-            width: containerSize,
-            height: containerSize,
+            width: '100%',
+            height: '100%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             background: 'rgba(31, 41, 55, 0.3)',
             borderRadius: '12px',
-            flexShrink: 0,
           }}
         >
           <div style={{ textAlign: 'center' }}>
@@ -85,7 +95,7 @@ const FardaImage = ({ farda, size = 'medium' }) => {
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 };
 ;
