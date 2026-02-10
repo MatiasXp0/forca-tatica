@@ -27,80 +27,47 @@ const FardaImage = ({ farda, size = 'medium' }) => {
   const iconSize = sizes[size].icon;
 
   return (
-    <div
-      style={{
-        width: containerSize,
-        height: containerSize,
-        borderRadius: '12px',
-        overflow: 'hidden',
-        position: 'relative',
-        flexShrink: 0,
-        background: 'rgba(31, 41, 55, 0.3)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-    >
+    <>
       {farda.fotoURL ? (
-        <div
+        <img
+          src={farda.fotoURL}
+          alt={farda.nome}
           style={{
-            width: '100%',
-            height: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            position: 'relative',
-            overflow: 'hidden',
+            maxWidth: containerSize,
+            maxHeight: containerSize,
+            objectFit: 'contain',
+            borderRadius: '12px',
+            flexShrink: 0,
           }}
-        >
-          <img
-            src={farda.fotoURL}
-            alt={farda.nome}
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'contain',
-            }}
-            className="transition-transform duration-300 hover:scale-105"
-            onError={(e) => {
-              e.target.style.display = 'none';
-              const parent = e.target.parentElement;
-              if (parent) {
-                parent.innerHTML = `
-                <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:rgba(31,41,55,0.5);">
-                  <div style="text-align:center">
-                    <Shirt size="${iconSize}" style="color:rgba(255,255,255,0.6)" />
-                    <div style="color:rgba(255,255,255,0.5);font-size:12px;margin-top:6px;font-weight:600">${
-                      farda.nome.split(' ')[0]
-                    }</div>
-                  </div>
+          className="transition-transform duration-300 hover:scale-105"
+          onError={(e) => {
+            e.target.style.display = 'none';
+            const parent = e.target.parentElement;
+            if (parent) {
+              parent.innerHTML = `
+              <div style="width:${containerSize};height:${containerSize};display:flex;align-items:center;justify-content:center;background:rgba(31,41,55,0.5);border-radius:12px;">
+                <div style="text-align:center">
+                  <Shirt size="${iconSize}" style="color:rgba(255,255,255,0.6)" />
+                  <div style="color:rgba(255,255,255,0.5);font-size:12px;margin-top:6px;font-weight:600">${
+                farda.nome.split(' ')[0]
+              }</div>
                 </div>
-              `;
-              }
-            }}
-          />
-          <div
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              background:
-                'linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.3) 100%)',
-              pointerEvents: 'none',
-            }}
-          ></div>
-        </div>
+              </div>
+            `;
+            }
+          }}
+        />
       ) : (
         <div
           style={{
-            width: '100%',
-            height: '100%',
+            width: containerSize,
+            height: containerSize,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            background: 'rgba(31,41,55,0.5)',
+            background: 'rgba(31, 41, 55, 0.3)',
+            borderRadius: '12px',
+            flexShrink: 0,
           }}
         >
           <div style={{ textAlign: 'center' }}>
@@ -109,7 +76,7 @@ const FardaImage = ({ farda, size = 'medium' }) => {
               style={{
                 color: 'rgba(255,255,255,0.5)',
                 fontSize: '12px',
-                marginTop: '8px',
+                marginTop: '6px',
                 fontWeight: '600',
               }}
             >
@@ -118,22 +85,10 @@ const FardaImage = ({ farda, size = 'medium' }) => {
           </div>
         </div>
       )}
-
-      <div
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          border: '2px solid rgba(59, 130, 246, 0.5)',
-          borderRadius: '13px',
-          pointerEvents: 'none',
-        }}
-      ></div>
-    </div>
+    </>
   );
 };
+;
 
 const Fardamentos = ({ isAdmin }) => {
   const [fardamentos, setFardamentos] = useState([]);
