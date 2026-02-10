@@ -59,8 +59,7 @@ const FardaImage = ({ farda, size = 'medium' }) => {
             style={{
               width: '100%',
               height: '100%',
-              objectFit: 'cover',
-              objectPosition: 'center',
+              objectFit: 'contain',
             }}
             className="transition-transform duration-300 hover:scale-105"
             onError={(e) => {
@@ -832,7 +831,7 @@ const Fardamentos = ({ isAdmin }) => {
                         <img
                           src={formData.fotoURL}
                           alt="Preview"
-                          className="w-full h-full object-cover image-preview"
+                          className="w-full h-full object-contain image-preview"
                           onError={(e) => {
                             e.target.src =
                               'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iOTYiIGhlaWdodD0iOTYiIHZpZXdCb3g9IjAgMCA5NiA5NiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iOTYiIGhlaWdodD0iOTYiIGZpbGw9IiMxRjJBM0MiLz48cGF0aCBkPSJNNDggNDhMMzIgNjRMMTYgNDhMMzIgMzJMNDggNDhaIiBmaWxsPSIjM0I4MkVGIi8+PC9zdmc+';
