@@ -32,6 +32,25 @@ export const Viaturas = ({ isAdmin }) => {
     return unsubscribe;
   }, []);
 
+  useEffect(() => {
+  const handleEsc = (e) => {
+    if (e.key === 'Escape' && isModalOpen) {
+      setModalOpen(false);
+      setEditingViatura(null);
+      setFormData({
+        nome: '',
+        modelo: '',
+        velocidadeMax: '',
+        descricao: '',
+        fotoURL: '',
+      });
+    }
+  };
+
+  window.addEventListener('keydown', handleEsc);
+  return () => window.removeEventListener('keydown', handleEsc);
+}, [isModalOpen]);
+
   const handleSave = async () => {
     if (!formData.nome || !formData.modelo) {
       alert('Preencha pelo menos nome e modelo!');
