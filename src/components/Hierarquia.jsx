@@ -79,6 +79,38 @@ const Hierarquia = ({ isAdmin }) => {
     });
   }, []);
 
+  // ESC para fechar modais (membro e advertência)
+useEffect(() => {
+  const handleEsc = (e) => {
+    if (e.key === 'Escape') {
+      if (isModalOpen) {
+        setModalOpen(false);
+        setEditingMembro(null);
+        setFormData({
+          nome: '',
+          patente: 'Tenente Coronel',
+          fotoURL: '',
+          ativo: true,
+          observacoes: '',
+        });
+      }
+      if (isAdvertenciaModalOpen) {
+        setAdvertenciaModalOpen(false);
+        setAdvertenciaForm({
+          tipo: 'ausencia',
+          motivo: '',
+          dataInicio: new Date().toISOString().split('T')[0],
+          dataFim: '',
+          descricao: '',
+        });
+      }
+    }
+  };
+
+  window.addEventListener('keydown', handleEsc);
+  return () => window.removeEventListener('keydown', handleEsc);
+}, [isModalOpen, isAdvertenciaModalOpen]);
+
   const handleSaveMembro = async () => {
     if (!formData.nome || !formData.patente) {
       alert('Preencha nome e patente!');
