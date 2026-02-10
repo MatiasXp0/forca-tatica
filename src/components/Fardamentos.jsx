@@ -158,6 +158,24 @@ const Fardamentos = ({ isAdmin }) => {
       setFardamentos(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
   }, []);
+  
+  useEffect(() => {
+  const handleEsc = (e) => {
+    if (e.key === 'Escape' && isModalOpen) {
+      setModalOpen(false);
+      setEditingFarda(null);
+      setFormData({
+        nome: '',
+        descricao: '',
+        fotoURL: '',
+        pecas: [{ tipo: '', numero: '', textura: '', descricao: '' }],
+      });
+    }
+  };
+
+  window.addEventListener('keydown', handleEsc);
+  return () => window.removeEventListener('keydown', handleEsc);
+}, [isModalOpen]);
 
   const handleSaveFarda = async () => {
     if (!formData.nome) {
