@@ -158,6 +158,67 @@ const Hierarquia = ({ isAdmin }) => {
     }
   };
 
+  const handleSaveMembro = async () => {
+    if (!formData.nome || !formData.patente) {
+      alert('Preencha nome e patente!');
+      return;
+    }
+
+    const membroData = {
+      ...formData,
+      advertências: editingMembro?.advertências || [],
+      createdAt: new Date(),
+      createdBy: auth.currentUser?.uid || '',
+    };
+
+    try {
+      if (editingMembro) {
+        // Atualizar membro existente
+        await updateDoc(doc(db, 'hierarquia', editingMembro.id), membroData);
+
+        // 🔄 Sincronizar com Discord
+        await upsertDiscordMessage('hierarquia', editingMembro.id, {
+          ...membroData,
+          id: editingMembro.id,
+        });
+      } else {
+        // Criar novo membro
+        const result = await addDoc(collection(db, 'hierarquia'), membroData);
+
+        // 🔄 Sincronizar com Discord
+        await upsertDiscordMessage('hierarquia', result.id, {
+          ...membroData,
+          id: result.id,
+        });
+      }
+
+      setModalOpen(false);
+      setEditingMembro(null);
+      setFormData({
+        nome: '',
+        patente: 'Tenente Coronel',
+        fotoURL: '',
+        ativo: true,
+        observacoes: '',
+      });
+
+      // Log de sucesso
+      await sendDiscordLog(
+        `${
+          editingMembro ? '📝 Membro atualizado' : '👤 Novo membro adicionado'
+        }: **${membroData.nome}** (${membroData.patente})`,
+        'success'
+      );
+    } catch (error) {
+      console.error('Erro ao salvar membro:', error);
+      alert('Erro ao salvar membro. Tente novamente.');
+      await sendDiscordLog(
+        `❌ Erro ao salvar membro: ${error.message}`,
+        'error'
+      );
+    }
+  };
+
   const handleSaveAdvertencia = async () => {
     if (!selectedMembro || !advertenciaForm.motivo || advertenciaSubmitting) {
       alert('Preencha o motivo!');
