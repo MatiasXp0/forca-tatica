@@ -19,7 +19,7 @@ import {
   deleteDiscordMessage,
 } from '../utils/discordManager';
 
-// Componente de imagem com fallback elegante (CORRIGIDO)
+// Componente de imagem com fallback elegante
 const FardaImage = ({ farda, size = 'medium' }) => {
   const [imgError, setImgError] = useState(false);
 
@@ -277,11 +277,11 @@ const Fardamentos = ({ isAdmin }) => {
         )}
       </div>
 
-      {/* ===== LAYOUT PRINCIPAL ===== */}
-      <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 xl:gap-10">
+      {/* ===== LAYOUT PRINCIPAL COM SCROLL INDEPENDENTE ===== */}
+      <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 xl:gap-10" style={{ height: 'calc(100vh - 220px)' }}>
         
-        {/* === COLUNA ESQUERDA - CATÁLOGO === */}
-        <div className="w-full lg:w-7/12 xl:w-8/12">
+        {/* === COLUNA ESQUERDA - CATÁLOGO (SCROLL PRÓPRIO) === */}
+        <div className="w-full lg:w-7/12 xl:w-8/12 h-full overflow-y-auto">
           <div className="bg-gradient-to-br from-gray-800/40 to-gray-900/40 backdrop-blur-sm border border-blue-500/20 rounded-2xl p-4 lg:p-5 xl:p-6 flex flex-col w-full h-full shadow-xl">
             
             {/* Título da seção */}
@@ -297,23 +297,23 @@ const Fardamentos = ({ isAdmin }) => {
               </span>
             </div>
 
-            {/* Lista de fardamentos - SCROLL OTIMIZADO */}
+            {/* Lista de fardamentos - OCUPA ALTURA DISPONÍVEL */}
             <div className="flex-1 overflow-hidden">
-              {fardamentos.length === 0 ? (
-                <div className="text-center py-12 lg:py-16">
-                  <div className="w-20 h-20 lg:w-24 lg:h-24 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 flex items-center justify-center">
-                    <Shirt size={40} className="lg:w-12 lg:h-12 text-gray-600" />
+              <div className="h-full overflow-y-auto pr-2 lg:pr-3 space-y-3 lg:space-y-2">
+                {fardamentos.length === 0 ? (
+                  <div className="text-center py-12 lg:py-16">
+                    <div className="w-20 h-20 lg:w-24 lg:h-24 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 flex items-center justify-center">
+                      <Shirt size={40} className="lg:w-12 lg:h-12 text-gray-600" />
+                    </div>
+                    <p className="text-gray-400 text-base lg:text-lg">Nenhum fardamento cadastrado</p>
+                    {isAdmin && (
+                      <p className="text-xs lg:text-sm text-gray-500 mt-2">
+                        Clique em "Novo Fardamento" para adicionar
+                      </p>
+                    )}
                   </div>
-                  <p className="text-gray-400 text-base lg:text-lg">Nenhum fardamento cadastrado</p>
-                  {isAdmin && (
-                    <p className="text-xs lg:text-sm text-gray-500 mt-2">
-                      Clique em "Novo Fardamento" para adicionar
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-3 lg:space-y-2 max-h-[calc(100vh-280px)] lg:max-h-[calc(100vh-240px)] overflow-y-auto pr-2 lg:pr-3 scroll-smooth">
-                  {fardamentos.map((farda) => {
+                ) : (
+                  fardamentos.map((farda) => {
                     const colors = getFardaColor(farda.nome);
                     const isSelected = selectedFarda?.id === farda.id;
                     return (
@@ -402,16 +402,16 @@ const Fardamentos = ({ isAdmin }) => {
                         )}
                       </div>
                     );
-                  })}
-                </div>
-              )}
+                  })
+                )}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* === COLUNA DIREITA - COMPOSIÇÃO === (INDENTAÇÃO CORRIGIDA) */}
-        <div className="w-full lg:w-6/12 xl:w-5/12">
-          <div className="bg-gradient-to-b from-gray-800/40 to-gray-900/40 backdrop-blur-sm border border-blue-500/20 rounded-2xl p-5 lg:p-6 xl:p-7 flex flex-col w-full h-full shadow-xl min-h-[400px] lg:min-h-[600px]">
+        {/* === COLUNA DIREITA - COMPOSIÇÃO (SCROLL PRÓPRIO) === */}
+        <div className="w-full lg:w-6/12 xl:w-5/12 h-full overflow-y-auto">
+          <div className="bg-gradient-to-b from-gray-800/40 to-gray-900/40 backdrop-blur-sm border border-blue-500/20 rounded-2xl p-5 lg:p-6 xl:p-7 flex flex-col w-full h-full shadow-xl">
             {selectedFarda ? (
               <>
                 {/* Header da composição */}
@@ -450,7 +450,7 @@ const Fardamentos = ({ isAdmin }) => {
                   </div>
                 </div>
 
-                {/* Lista de peças - COM QUEBRA DE LINHA OTIMIZADA */}
+                {/* Lista de peças */}
                 <div className="flex-1 flex flex-col overflow-hidden">
                   <h4 className="font-semibold text-gray-300 mb-3 flex items-center gap-2 text-sm lg:text-base border-b border-gray-700/80 pb-2">
                     <Layers size={18} className="text-blue-400" />
@@ -469,7 +469,6 @@ const Fardamentos = ({ isAdmin }) => {
                             >
                               <span className="text-sm lg:text-base font-bold text-white">{index + 1}</span>
                             </div>
-                            {/* min-w-0 + break-words garantem quebra adequada */}
                             <div className="flex-1 min-w-0">
                               <h5 className="font-semibold text-white text-sm lg:text-base break-words">
                                 {typeof peca === 'string'
@@ -522,8 +521,8 @@ const Fardamentos = ({ isAdmin }) => {
                 )}
               </>
             ) : (
-              /* Placeholder elegante quando nada selecionado */
-              <div className="flex flex-col items-center justify-center h-full min-h-[400px] lg:min-h-[500px] text-center">
+              /* Placeholder quando nada selecionado */
+              <div className="flex flex-col items-center justify-center h-full min-h-[400px] lg:min-h-0 text-center">
                 <div className="w-24 h-24 lg:w-32 lg:h-32 mb-6 rounded-3xl bg-gradient-to-br from-gray-800/50 to-gray-900/50 border-2 border-dashed border-gray-700 flex items-center justify-center">
                   <Shirt size={48} className="lg:w-16 lg:h-16 text-gray-600" />
                 </div>
@@ -776,7 +775,7 @@ const Fardamentos = ({ isAdmin }) => {
           </div>
         </div>
       )}
-    </div>  
+    </div>
   );
 };
 
