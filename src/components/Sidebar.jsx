@@ -69,7 +69,7 @@ export const Sidebar = ({ collapsed, toggleSidebar, user, isAdmin }) => {
           )}
           <button
             onClick={toggleSidebar}
-            className="p-1.5 hover:bg-gray-700/50 rounded-lg transition"
+            className="hidden lg:block p-1.5 hover:bg-gray-700/50 rounded-lg transition"
             title={collapsed ? 'Expandir menu' : 'Recolher menu'}
           >
             {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
