@@ -34,6 +34,8 @@ import { formatContent } from './utils/markdownFormatter';
 import {
   upsertDiscordMessage,
   deleteDiscordMessage,
+  hideDiscordMessage, // ✅ NOVO
+  showDiscordMessage, // ✅ NOVO
 } from '../utils/discordManager';
 
 const Comunicados = ({ isAdmin }) => {
@@ -74,7 +76,9 @@ const Comunicados = ({ isAdmin }) => {
       }));
 
       if (!isAdmin) {
-        setComunicados(todosComunicados.filter((com) => com.isActive !== false));
+        setComunicados(
+          todosComunicados.filter((com) => com.isActive !== false)
+        );
       } else {
         setComunicados(todosComunicados);
       }
@@ -173,29 +177,32 @@ const Comunicados = ({ isAdmin }) => {
       createdAt: editingCom ? editingCom.createdAt : new Date(),
       updatedAt: new Date(),
       createdBy: auth.currentUser?.uid || '',
-      createdByName: auth.currentUser?.displayName || auth.currentUser?.email || 'Sistema',
+      createdByName:
+        auth.currentUser?.displayName || auth.currentUser?.email || 'Sistema',
     };
 
     try {
       let discordMessageId = null;
 
       if (editingCom) {
-        // === EDIÇÃO ===
+        // === EDIÇÃO: SOMENTE FIREBASE ===
         await updateDoc(doc(db, 'comunicados', editingCom.id), comunicadoData);
-
-        discordMessageId = await upsertDiscordMessage('comunicados', editingCom.id, {
-          ...comunicadoData,
-          id: editingCom.id,
-          discordMessageId: editingCom.discordMessageId,
-        });
+        // ❌ DISCORD REMOVIDO - Edição não gera mensagem
       } else {
-        // === CRIAÇÃO ===
-        const docRef = await addDoc(collection(db, 'comunicados'), comunicadoData);
+        // === CRIAÇÃO: Firebase + Discord ===
+        const docRef = await addDoc(
+          collection(db, 'comunicados'),
+          comunicadoData
+        );
 
-        discordMessageId = await upsertDiscordMessage('comunicados', docRef.id, {
-          ...comunicadoData,
-          id: docRef.id,
-        });
+        discordMessageId = await upsertDiscordMessage(
+          'comunicados',
+          docRef.id,
+          {
+            ...comunicadoData,
+            id: docRef.id,
+          }
+        );
 
         if (discordMessageId) {
           await updateDoc(doc(db, 'comunicados', docRef.id), {
@@ -205,7 +212,11 @@ const Comunicados = ({ isAdmin }) => {
       }
 
       closeModal();
-      console.log(`✅ Comunicado ${editingCom ? 'atualizado' : 'publicado'}: ${comunicadoData.titulo}`);
+      console.log(
+        `✅ Comunicado ${editingCom ? 'atualizado' : 'publicado'}: ${
+          comunicadoData.titulo
+        }`
+      );
     } catch (error) {
       console.error('Erro ao salvar comunicado:', error);
       alert('Erro ao salvar comunicado. Tente novamente.');
@@ -257,6 +268,56 @@ const Comunicados = ({ isAdmin }) => {
     }
   };
 
+  // ========== OCULTAR COMUNICADO ==========
+  const handleHideCom = async (com) => {
+    try {
+      // ✅ Remover do Discord
+      if (com.discordMessageId) {
+        await hideDiscordMessage('comunicados', {
+          ...com,
+          id: com.id,
+          discordMessageId: com.discordMessageId,
+        });
+      }
+
+      // ✅ Atualizar Firebase
+      await updateDoc(doc(db, 'comunicados', com.id), {
+        isActive: false,
+        updatedAt: new Date(),
+      });
+
+      console.log(`🙈 Comunicado ocultado: ${com.titulo}`);
+    } catch (error) {
+      console.error('Erro ao ocultar comunicado:', error);
+      alert('Erro ao ocultar comunicado. Tente novamente.');
+    }
+  };
+
+  // ========== MOSTRAR COMUNICADO ==========
+  const handleShowCom = async (com) => {
+    try {
+      // ✅ Republicar no Discord
+      const discordMessageId = await showDiscordMessage('comunicados', {
+        ...com,
+        id: com.id,
+        isActive: true,
+        isUrgente: com.isUrgente,
+      });
+
+      // ✅ Atualizar Firebase
+      await updateDoc(doc(db, 'comunicados', com.id), {
+        isActive: true,
+        discordMessageId: discordMessageId || com.discordMessageId,
+        updatedAt: new Date(),
+      });
+
+      console.log(`👁️ Comunicado reativado: ${com.titulo}`);
+    } catch (error) {
+      console.error('Erro ao mostrar comunicado:', error);
+      alert('Erro ao mostrar comunicado. Tente novamente.');
+    }
+  };
+
   // ========== TOGGLE ATIVO ==========
   const toggleComStatus = async (com) => {
     try {
@@ -273,7 +334,9 @@ const Comunicados = ({ isAdmin }) => {
         });
       }
 
-      console.log(`📢 Comunicado ${com.titulo} ${!com.isActive ? 'visível' : 'oculto'}`);
+      console.log(
+        `📢 Comunicado ${com.titulo} ${!com.isActive ? 'visível' : 'oculto'}`
+      );
     } catch (error) {
       console.error('Erro ao alterar status:', error);
       alert('Erro ao alterar status. Tente novamente.');
@@ -296,7 +359,11 @@ const Comunicados = ({ isAdmin }) => {
         });
       }
 
-      console.log(`⚠️ Comunicado ${com.titulo} ${!com.isUrgente ? 'marcado como urgente' : 'urgência removida'}`);
+      console.log(
+        `⚠️ Comunicado ${com.titulo} ${
+          !com.isUrgente ? 'marcado como urgente' : 'urgência removida'
+        }`
+      );
     } catch (error) {
       console.error('Erro ao alterar urgência:', error);
       alert('Erro ao alterar urgência. Tente novamente.');
@@ -431,7 +498,10 @@ const Comunicados = ({ isAdmin }) => {
                       type="checkbox"
                       checked={formData.isUrgente}
                       onChange={(e) =>
-                        setFormData({ ...formData, isUrgente: e.target.checked })
+                        setFormData({
+                          ...formData,
+                          isUrgente: e.target.checked,
+                        })
                       }
                       className="w-4 h-4 accent-red-600"
                     />
@@ -444,7 +514,10 @@ const Comunicados = ({ isAdmin }) => {
                         type="checkbox"
                         checked={formData.isActive}
                         onChange={(e) =>
-                          setFormData({ ...formData, isActive: e.target.checked })
+                          setFormData({
+                            ...formData,
+                            isActive: e.target.checked,
+                          })
                         }
                         className="w-4 h-4 accent-blue-600"
                       />
@@ -521,7 +594,8 @@ const Comunicados = ({ isAdmin }) => {
                     className="w-full bg-gray-900 border border-blue-500/20 rounded-lg p-3 text-white outline-none focus:border-blue-500 resize-none font-mono text-sm"
                   />
                   <div className="text-xs text-gray-500 mt-1">
-                    Dica: Use **negrito**, *itálico*, # Título, ## Subtítulo, - lista
+                    Dica: Use **negrito**, *itálico*, # Título, ## Subtítulo, -
+                    lista
                   </div>
                 </div>
 
@@ -599,8 +673,14 @@ const Comunicados = ({ isAdmin }) => {
                 key={com.id}
                 className={`
                   bg-gray-800/50 border rounded-xl overflow-hidden transition
-                  ${!com.isActive && isAdmin ? 'border-gray-700 opacity-60' : ''}
-                  ${com.isUrgente ? 'border-red-500/50 bg-red-900/10' : 'border-blue-500/20 hover:border-blue-500/40'}
+                  ${
+                    !com.isActive && isAdmin ? 'border-gray-700 opacity-60' : ''
+                  }
+                  ${
+                    com.isUrgente
+                      ? 'border-red-500/50 bg-red-900/10'
+                      : 'border-blue-500/20 hover:border-blue-500/40'
+                  }
                 `}
               >
                 {/* Cabeçalho do comunicado */}
@@ -624,11 +704,13 @@ const Comunicados = ({ isAdmin }) => {
                         <h3 className="font-bold">{com.titulo}</h3>
                         <p className="text-gray-400 text-sm">
                           {formatDate(com.createdAt)}
-                          {com.createdByName && ` • por ${com.createdByName.split('@')[0]}`}
+                          {com.createdByName &&
+                            ` • por ${com.createdByName.split('@')[0]}`}
                         </p>
                         {com.discordMessageId && (
                           <p className="text-xs text-gray-500 mt-1">
-                            🟢 Discord ID: {com.discordMessageId.substring(0, 8)}...
+                            🟢 Discord ID:{' '}
+                            {com.discordMessageId.substring(0, 8)}...
                           </p>
                         )}
                       </div>
@@ -679,10 +761,14 @@ const Comunicados = ({ isAdmin }) => {
                             🔗 LINK DIRETO PARA ESTE COMUNICADO
                           </span>
                           <span className="text-xs text-gray-400 font-mono break-all">
-                            https://forca-tatica.vercel.app/comunicados?id={com.id}
+                            https://forca-tatica.vercel.app/comunicados?id=
+                            {com.id}
                           </span>
                         </div>
-                        <ChevronUp size={20} className="rotate-45 group-hover:translate-x-1 group-hover:-translate-y-1 transition" />
+                        <ChevronUp
+                          size={20}
+                          className="rotate-45 group-hover:translate-x-1 group-hover:-translate-y-1 transition"
+                        />
                       </a>
                     </div>
 
@@ -695,17 +781,23 @@ const Comunicados = ({ isAdmin }) => {
                         >
                           <Edit size={14} /> Editar
                         </button>
-                        <button
-                          onClick={() => toggleComStatus(com)}
-                          className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2 rounded text-sm flex items-center justify-center gap-1 transition"
-                        >
-                          {com.isActive ? (
-                            <EyeOff size={14} />
-                          ) : (
-                            <Eye size={14} />
-                          )}
-                          {com.isActive ? ' Ocultar' : ' Mostrar'}
-                        </button>
+
+                        {com.isActive ? (
+                          <button
+                            onClick={() => handleHideCom(com)} // ✅ NOVO
+                            className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2 rounded text-sm flex items-center justify-center gap-1 transition"
+                          >
+                            <EyeOff size={14} /> Ocultar
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleShowCom(com)} // ✅ NOVO
+                            className="flex-1 bg-green-600/20 hover:bg-green-600/30 text-green-400 py-2 rounded text-sm flex items-center justify-center gap-1 transition"
+                          >
+                            <Eye size={14} /> Mostrar
+                          </button>
+                        )}
+
                         <button
                           onClick={() => toggleComUrgente(com)}
                           className={`flex-1 py-2 rounded text-sm flex items-center justify-center gap-1 transition ${
@@ -717,6 +809,7 @@ const Comunicados = ({ isAdmin }) => {
                           <AlertTriangle size={14} />
                           {com.isUrgente ? 'Remover urgência' : 'Urgente'}
                         </button>
+
                         <button
                           onClick={() => handleDeleteCom(com.id)}
                           className="flex-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 py-2 rounded text-sm flex items-center justify-center gap-1 transition"
@@ -735,7 +828,8 @@ const Comunicados = ({ isAdmin }) => {
                         </span>
                       )}
                       <span className="ml-4">
-                        Última atualização: {formatDate(com.updatedAt || com.createdAt)}
+                        Última atualização:{' '}
+                        {formatDate(com.updatedAt || com.createdAt)}
                       </span>
                     </div>
                   </div>
