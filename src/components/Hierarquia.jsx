@@ -31,8 +31,7 @@ import { getAdvertenciaColor } from './utils/fardaColors';
 import {
   upsertDiscordMessage,
   deleteDiscordMessage,
-  sendDiscordLog,
-} from '../utils/discordBotSystem';
+} from '../utils/discordManager'; // 👈 IMPORTANTE: Mudar para discordManager
 
 const Hierarquia = ({ isAdmin }) => {
   const [membros, setMembros] = useState([]);
@@ -117,6 +116,78 @@ const Hierarquia = ({ isAdmin }) => {
     return () => window.removeEventListener('keydown', handleEsc);
   }, [isModalOpen, isAdvertenciaModalOpen]);
 
+  // ========== HANDLE SAVE MEMBRO - ATUALIZADO ==========
+  const handleSaveMembro = async () => {
+    if (!formData.nome || !formData.patente) {
+      alert('Preencha nome e patente!');
+      return;
+    }
+
+    const membroData = {
+      ...formData,
+      advertências: editingMembro?.advertências || [],
+      createdAt: editingMembro ? editingMembro.createdAt : new Date(),
+      updatedAt: new Date(),
+      createdBy: auth.currentUser?.uid || '',
+    };
+
+    try {
+      let discordMessageId = null;
+
+      if (editingMembro) {
+        // === EDIÇÃO: Atualizar membro existente ===
+        await updateDoc(doc(db, 'hierarquia', editingMembro.id), membroData);
+
+        // 🔄 Sincronizar com Discord (ATUALIZA a mensagem existente)
+        discordMessageId = await upsertDiscordMessage(
+          'hierarquia',
+          editingMembro.id,
+          {
+            ...membroData,
+            id: editingMembro.id,
+            discordMessageId: editingMembro.discordMessageId,
+          }
+        );
+      } else {
+        // === CRIAÇÃO: Novo membro ===
+        const result = await addDoc(collection(db, 'hierarquia'), membroData);
+
+        // 🔄 Sincronizar com Discord (CRIA nova mensagem)
+        discordMessageId = await upsertDiscordMessage('hierarquia', result.id, {
+          ...membroData,
+          id: result.id,
+        });
+
+        // 💾 SALVAR o ID da mensagem no Firebase!
+        if (discordMessageId) {
+          await updateDoc(doc(db, 'hierarquia', result.id), {
+            discordMessageId: discordMessageId,
+          });
+        }
+      }
+
+      // ✅ Limpar estado e fechar modal
+      setModalOpen(false);
+      setEditingMembro(null);
+      setFormData({
+        nome: '',
+        patente: 'Tenente Coronel',
+        fotoURL: '',
+        ativo: true,
+        observacoes: '',
+      });
+
+      // 📋 Log de sucesso
+      console.log(
+        `✅ Membro ${editingMembro ? 'atualizado' : 'adicionado'}: ${membroData.nome}`
+      );
+    } catch (error) {
+      console.error('Erro ao salvar membro:', error);
+      alert('Erro ao salvar membro. Tente novamente.');
+    }
+  };
+
+  // ========== HANDLE DELETE MEMBRO - ATUALIZADO ==========
   const handleDeleteMembro = async (id) => {
     if (window.confirm('Tem certeza que deseja excluir este membro?')) {
       try {
@@ -128,17 +199,13 @@ const Hierarquia = ({ isAdmin }) => {
           throw new Error('Membro não encontrado');
         }
 
-        // 🔄 Remover do Discord primeiro
+        // 🔄 Remover do Discord PRIMEIRO
         if (membroData?.discordMessageId) {
-          const deleted = await deleteDiscordMessage('hierarquia', {
+          await deleteDiscordMessage('hierarquia', {
             ...membroData,
             id: id,
             discordMessageId: membroData.discordMessageId,
           });
-
-          if (!deleted) {
-            console.warn('Não foi possível remover a mensagem do Discord');
-          }
         }
 
         // Depois deletar do Firebase
@@ -150,99 +217,16 @@ const Hierarquia = ({ isAdmin }) => {
           setSelectedMembro(null);
         }
 
-        // Log de remoção
-        await sendDiscordLog(
-          `🗑️ Membro removido: **${membroData?.nome || 'Desconhecido'}** (${
-            membroData?.patente
-          })`,
-          'warning'
-        );
+        // 📋 Log de remoção
+        console.log(`🗑️ Membro removido: ${membroData?.nome}`);
       } catch (error) {
         console.error('Erro ao excluir membro:', error);
         alert('Erro ao excluir membro. Tente novamente.');
-        await sendDiscordLog(
-          `❌ Erro ao excluir membro: ${error.message}`,
-          'error'
-        );
       }
     }
   };
 
-  const handleSaveMembro = async () => {
-    if (!formData.nome || !formData.patente) {
-      alert('Preencha nome e patente!');
-      return;
-    }
-
-    const membroData = {
-      ...formData,
-      advertências: editingMembro?.advertências || [],
-      createdAt: new Date(),
-      createdBy: auth.currentUser?.uid || '',
-    };
-
-    try {
-      let discordMessageId = null;
-
-      if (editingMembro) {
-        // Atualizar membro existente
-        await updateDoc(doc(db, 'hierarquia', editingMembro.id), membroData);
-
-        // 🔄 Sincronizar com Discord
-        discordMessageId = await upsertDiscordMessage(
-          'hierarquia',
-          editingMembro.id,
-          {
-            ...membroData,
-            id: editingMembro.id,
-            discordMessageId: editingMembro.discordMessageId, // Mantém o ID existente
-          }
-        );
-      } else {
-        // Criar novo membro
-        const result = await addDoc(collection(db, 'hierarquia'), membroData);
-
-        // 🔄 Sincronizar com Discord primeiro
-        discordMessageId = await upsertDiscordMessage('hierarquia', result.id, {
-          ...membroData,
-          id: result.id,
-        });
-
-        // Atualizar no Firebase com o discordMessageId
-        if (discordMessageId) {
-          await updateDoc(doc(db, 'hierarquia', result.id), {
-            discordMessageId: discordMessageId,
-          });
-        }
-      }
-
-      setModalOpen(false);
-      setEditingMembro(null);
-      setFormData({
-        nome: '',
-        patente: 'Tenente Coronel',
-        fotoURL: '',
-        ativo: true,
-        observacoes: '',
-      });
-
-      // Log de sucesso
-      await sendDiscordLog(
-        `${
-          editingMembro ? '📝 Membro atualizado' : '👤 Novo membro adicionado'
-        }: **${membroData.nome}** (${membroData.patente})`,
-        'success'
-      );
-    } catch (error) {
-      console.error('Erro ao salvar membro:', error);
-      alert('Erro ao salvar membro. Tente novamente.');
-      await sendDiscordLog(
-        `❌ Erro ao salvar membro: ${error.message}`,
-        'error'
-      );
-    }
-  };
-
+  // ========== HANDLE SAVE ADVERTÊNCIA - AGORA ATUALIZA DISCORD ==========
   const handleSaveAdvertencia = async () => {
     if (!selectedMembro || !advertenciaForm.motivo || advertenciaSubmitting) {
       alert('Preencha o motivo!');
@@ -264,6 +248,8 @@ const Hierarquia = ({ isAdmin }) => {
       const membroData = membroDoc.data();
 
       const advertênciasExistentes = membroData.advertências || [];
+      
+      // Verificar duplicata
       const jaExiste = advertênciasExistentes.some(
         (adv) =>
           adv.tipo === novaAdvertencia.tipo &&
@@ -277,26 +263,33 @@ const Hierarquia = ({ isAdmin }) => {
         return;
       }
 
+      // Atualizar Firebase
       await updateDoc(membroRef, {
         advertências: [...advertênciasExistentes, novaAdvertencia],
       });
 
-      setSelectedMembro({
+      // 🔄 ATUALIZAR DISCORD - MENSAGEM DO MEMBRO
+      const membroAtualizado = {
         ...selectedMembro,
         advertências: [...advertênciasExistentes, novaAdvertencia],
-      });
+      };
 
+      if (selectedMembro.discordMessageId) {
+        await upsertDiscordMessage('hierarquia', selectedMembro.id, {
+          ...membroAtualizado,
+          discordMessageId: selectedMembro.discordMessageId,
+        });
+      }
+
+      // Atualizar estado local
+      setSelectedMembro(membroAtualizado);
       setMembros((prevMembros) =>
         prevMembros.map((m) =>
-          m.id === selectedMembro.id
-            ? {
-                ...m,
-                advertências: [...advertênciasExistentes, novaAdvertencia],
-              }
-            : m
+          m.id === selectedMembro.id ? membroAtualizado : m
         )
       );
 
+      // Fechar modal
       setAdvertenciaModalOpen(false);
       setAdvertenciaForm({
         tipo: 'ausencia',
@@ -305,11 +298,97 @@ const Hierarquia = ({ isAdmin }) => {
         dataFim: '',
         descricao: '',
       });
+
+      console.log(`📝 ${novaAdvertencia.tipo} adicionado para ${selectedMembro.nome}`);
     } catch (error) {
       console.error('Erro ao salvar advertência:', error);
       alert('Erro ao salvar advertência. Tente novamente.');
     } finally {
       setAdvertenciaSubmitting(false);
+    }
+  };
+
+  // ========== HANDLE DELETE ADVERTÊNCIA - AGORA ATUALIZA DISCORD ==========
+  const handleDeleteAdvertencia = async (advertenciaId) => {
+    if (!selectedMembro) return;
+
+    if (window.confirm('Tem certeza que deseja excluir esta advertência?')) {
+      try {
+        const membroRef = doc(db, 'hierarquia', selectedMembro.id);
+        const membroDoc = await getDoc(membroRef);
+        const membroData = membroDoc.data();
+
+        const novasAdvertencias = membroData.advertências.filter(
+          (a) => a.id !== advertenciaId
+        );
+
+        // Atualizar Firebase
+        await updateDoc(membroRef, {
+          advertências: novasAdvertencias,
+        });
+
+        // 🔄 ATUALIZAR DISCORD - MENSAGEM DO MEMBRO
+        const membroAtualizado = {
+          ...selectedMembro,
+          advertências: novasAdvertencias,
+        };
+
+        if (selectedMembro.discordMessageId) {
+          await upsertDiscordMessage('hierarquia', selectedMembro.id, {
+            ...membroAtualizado,
+            discordMessageId: selectedMembro.discordMessageId,
+          });
+        }
+
+        // Atualizar estado local
+        setSelectedMembro(membroAtualizado);
+        setMembros((prevMembros) =>
+          prevMembros.map((m) =>
+            m.id === selectedMembro.id ? membroAtualizado : m
+          )
+        );
+
+        console.log(`🗑️ Registro removido de ${selectedMembro.nome}`);
+      } catch (error) {
+        console.error('Erro ao excluir advertência:', error);
+        alert('Erro ao excluir advertência. Tente novamente.');
+      }
+    }
+  };
+
+  // ========== HANDLE TOGGLE STATUS - ATUALIZADO ==========
+  const handleToggleStatus = async (membro) => {
+    if (window.confirm(`Alterar status de ${membro.nome}?`)) {
+      try {
+        const novoStatus = !membro.ativo;
+        
+        // Atualizar Firebase
+        await updateDoc(doc(db, 'hierarquia', membro.id), {
+          ativo: novoStatus,
+          updatedAt: new Date(),
+        });
+
+        // 🔄 ATUALIZAR DISCORD
+        if (membro.discordMessageId) {
+          await upsertDiscordMessage('hierarquia', membro.id, {
+            ...membro,
+            ativo: novoStatus,
+            discordMessageId: membro.discordMessageId,
+          });
+        }
+
+        // Atualizar estado local
+        const membroAtualizado = { ...membro, ativo: novoStatus };
+        setSelectedMembro(membroAtualizado);
+        setMembros((prev) =>
+          prev.map((m) => (m.id === membro.id ? membroAtualizado : m))
+        );
+
+        console.log(`🔄 Status alterado: ${membro.nome} → ${novoStatus ? 'ATIVO' : 'INATIVO'}`);
+      } catch (error) {
+        console.error('Erro ao alterar status:', error);
+        alert('Erro ao alterar status. Tente novamente.');
+      }
     }
   };
 
@@ -327,44 +406,6 @@ const Hierarquia = ({ isAdmin }) => {
 
   const handleViewMembro = (membro) => {
     setSelectedMembro(membro);
-  };
-
-  const handleDeleteAdvertencia = async (advertenciaId) => {
-    if (!selectedMembro) return;
-
-    if (window.confirm('Tem certeza que deseja excluir esta advertência?')) {
-      try {
-        const membroRef = doc(db, 'hierarquia', selectedMembro.id);
-        const membroDoc = await getDoc(membroRef);
-        const membroData = membroDoc.data();
-
-        const novasAdvertencias = membroData.advertências.filter(
-          (a) => a.id !== advertenciaId
-        );
-
-        await updateDoc(membroRef, {
-          advertências: novasAdvertencias,
-        });
-
-        const membroAtualizado = {
-          ...selectedMembro,
-          advertências: novasAdvertencias,
-        };
-
-        setSelectedMembro(membroAtualizado);
-
-        setMembros((prevMembros) =>
-          prevMembros.map((m) =>
-            m.id === selectedMembro.id
-              ? { ...m, advertências: novasAdvertencias }
-              : m
-          )
-        );
-      } catch (error) {
-        console.error('Erro ao excluir advertência:', error);
-        alert('Erro ao excluir advertência. Tente novamente.');
-      }
-    }
   };
 
   const getPatenteColor = () => {
@@ -459,6 +500,12 @@ const Hierarquia = ({ isAdmin }) => {
                               ).length || 0}{' '}
                               advertência(s)
                             </p>
+                            {/* ID do Discord (debug) - Remover depois */}
+                            {membro.discordMessageId && (
+                              <p className="text-xs text-gray-500 mt-1">
+                                🟢 ID: {membro.discordMessageId.substring(0, 8)}...
+                              </p>
+                            )}
                           </div>
                           <ChevronRight size={16} className="text-gray-500" />
                         </div>
@@ -525,6 +572,12 @@ const Hierarquia = ({ isAdmin }) => {
                         /3 advertências
                       </div>
                     </div>
+                    {/* ID do Discord (debug) */}
+                    {selectedMembro.discordMessageId && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        🟢 Discord sincronizado
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -632,27 +685,7 @@ const Hierarquia = ({ isAdmin }) => {
                       <Edit size={14} /> Editar
                     </button>
                     <button
-                      onClick={() => {
-                        if (
-                          window.confirm(
-                            `Alterar status de ${selectedMembro.nome}?`
-                          )
-                        ) {
-                          updateDoc(doc(db, 'hierarquia', selectedMembro.id), {
-                            ativo: !selectedMembro.ativo,
-                          })
-                            .then(() => {
-                              setSelectedMembro({
-                                ...selectedMembro,
-                                ativo: !selectedMembro.ativo,
-                              });
-                            })
-                            .catch((error) => {
-                              console.error('Erro ao alterar status:', error);
-                              alert('Erro ao alterar status. Tente novamente.');
-                            });
-                        }
-                      }}
+                      onClick={() => handleToggleStatus(selectedMembro)}
                       className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2 rounded text-sm flex items-center justify-center gap-1 transition"
                     >
                       {selectedMembro.ativo ? (
