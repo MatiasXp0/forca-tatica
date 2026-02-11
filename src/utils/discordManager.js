@@ -327,7 +327,7 @@ async syncComunicado(comunicado, action = 'upsert') {
   const isHide = action === 'hide';
   const isShow = action === 'show';
   const isUrgente = action === 'urgente';
-  const url = `https://forca-tatica.vercel.app/comunicados`; // ✅ LINK NORMAL
+  const url = `https://forca-tatica.vercel.app`; // ✅ LINK NORMAL
 
   try {
     // DELETE ou OCULTAR
@@ -376,7 +376,7 @@ async syncComunicado(comunicado, action = 'upsert') {
 // ========== EMBED DE COMUNICADO ==========
 _createComunicadoEmbed(comunicado, action = 'upsert') {
   const isShow = action === 'show';
-  const url = `https://forca-tatica.vercel.app/comunicados`; // ✅ LINK NORMAL
+  const url = `https://forca-tatica.vercel.app`; // ✅ LINK NORMAL
   
   // CORES POR TIPO
   const cores = {
