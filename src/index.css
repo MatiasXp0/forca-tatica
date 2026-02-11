@@ -2,32 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ✅ ÚNICA COISA QUE PRECISA ALÉM DO TAILWIND */
+/* ========== UTILITIES ========== */
 @layer utilities {
-  /* Hide scrollbar for mobile */
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
   .no-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;
-  } 
+  }
 }
 
-/* Seu scrollbar personalizado (opcional) */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-::-webkit-scrollbar-track {
-  background: rgba(31, 41, 55, 0.3);
-}
-::-webkit-scrollbar-thumb {
-  background: rgba(59, 130, 246, 0.5);
-  border-radius: 4px;
-}
-
-/* Melhorar a rolagem */
+/* ========== SCROLLBAR ========== */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -47,30 +33,7 @@
   background: rgba(59, 130, 246, 0.7);
 }
 
-/* ESTILOS PARA AS IMAGENS DE FARDAMENTO */
-.farda-image-container img {
-  object-fit: cover !important;
-  object-position: center center !important;
-  width: 100% !important;
-  height: 100% !important;
-}
-
-/* Remover background desnecessário */
-.farda-image-container {
-  background: transparent !important;
-}
-
-/* Garantir que as imagens preencham completamente */
-img.object-cover {
-  object-fit: cover !important;
-}
-/* Forçar imagens a preencherem sem cortes */
-img {
-  max-width: none !important;
-  max-height: none !important;
-}
-
-/* Imagens específicas para fardamentos */
+/* ========== FARDAMENTOS ========== */
 .farda-image-container {
   position: relative;
   background: linear-gradient(
@@ -78,6 +41,8 @@ img {
     rgba(31, 41, 55, 0.5),
     rgba(17, 24, 39, 0.3)
   ) !important;
+  overflow: hidden;
+  border-radius: 12px;
 }
 
 .farda-image-container img {
@@ -85,12 +50,14 @@ img {
   object-position: center !important;
   width: 100% !important;
   height: 100% !important;
-  position: relative !important;
-  z-index: 1;
+  transition: transform 0.3s ease;
 }
 
-/* Ajustar o hover para não cortar */
 .farda-image-container:hover img {
   transform: scale(1.05);
-  transition: transform 0.3s ease;
+}
+
+/* ========== UTILITÁRIOS ========== */
+img.object-cover {
+  object-fit: cover !important;
 }
