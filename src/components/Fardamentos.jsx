@@ -179,30 +179,27 @@ const Fardamentos = ({ isAdmin }) => {
       let discordMessageId = null;
 
       if (editingFarda) {
-        // === EDIÇÃO: Atualizar fardamento existente ===
+        // === EDIÇÃO: SOMENTE ATUALIZAR FIREBASE ===
         await updateDoc(doc(db, 'fardamentos', editingFarda.id), fardaData);
-        
-        // 🔄 Sincronizar com Discord (ATUALIZA a mensagem existente)
-        discordMessageId = await upsertDiscordMessage('fardamentos', editingFarda.id, {
-          ...fardaData,
-          id: editingFarda.id,
-          discordMessageId: editingFarda.discordMessageId // Mantém o ID existente
-        });
-        
+        // ❌ DISCORD REMOVIDO - Edição não gera mensagem
       } else {
-        // === CRIAÇÃO: Novo fardamento ===
+        // === CRIAÇÃO: Firebase + Discord ===
         const docRef = await addDoc(collection(db, 'fardamentos'), fardaData);
-        
-        // 🔄 Sincronizar com Discord (CRIA nova mensagem)
-        discordMessageId = await upsertDiscordMessage('fardamentos', docRef.id, {
-          ...fardaData,
-          id: docRef.id
-        });
-        
-        // 💾 SALVAR o ID da mensagem no Firebase!
+
+        // ✅ Discord APENAS na criação
+        discordMessageId = await upsertDiscordMessage(
+          'fardamentos',
+          docRef.id,
+          {
+            ...fardaData,
+            id: docRef.id,
+          }
+        );
+
+        // 💾 Salvar ID da mensagem
         if (discordMessageId) {
           await updateDoc(doc(db, 'fardamentos', docRef.id), {
-            discordMessageId: discordMessageId
+            discordMessageId: discordMessageId,
           });
         }
       }
@@ -217,9 +214,11 @@ const Fardamentos = ({ isAdmin }) => {
         pecas: [{ tipo: '', numero: '', textura: '', descricao: '' }],
       });
 
-      // 📋 Log de sucesso
-      console.log(`✅ Fardamento ${editingFarda ? 'atualizado' : 'criado'}: ${fardaData.nome}`);
-      
+      console.log(
+        `✅ Fardamento ${editingFarda ? 'atualizado' : 'criado'}: ${
+          fardaData.nome
+        }`
+      );
     } catch (error) {
       console.error('Erro ao salvar fardamento:', error);
       alert('Erro ao salvar fardamento. Tente novamente.');
@@ -243,7 +242,7 @@ const Fardamentos = ({ isAdmin }) => {
           await deleteDiscordMessage('fardamentos', {
             ...fardaData,
             id: id,
-            discordMessageId: fardaData.discordMessageId
+            discordMessageId: fardaData.discordMessageId,
           });
         }
 
@@ -251,7 +250,7 @@ const Fardamentos = ({ isAdmin }) => {
         await deleteDoc(doc(db, 'fardamentos', id));
 
         // 🎯 Atualizar estado local
-        setFardamentos(prev => prev.filter(f => f.id !== id));
+        setFardamentos((prev) => prev.filter((f) => f.id !== id));
         if (selectedFarda?.id === id) {
           setSelectedFarda(null);
         }
@@ -528,7 +527,9 @@ const Fardamentos = ({ isAdmin }) => {
                                         farda.createdAt.toDate()
                                       ).toLocaleDateString('pt-BR')
                                     : farda.createdAt
-                                    ? new Date(farda.createdAt).toLocaleDateString('pt-BR')
+                                    ? new Date(
+                                        farda.createdAt
+                                      ).toLocaleDateString('pt-BR')
                                     : 'N/A'}
                                 </div>
                               </div>
@@ -605,7 +606,9 @@ const Fardamentos = ({ isAdmin }) => {
                             selectedFarda.createdAt.toDate()
                           ).toLocaleDateString('pt-BR')
                         : selectedFarda.createdAt
-                        ? new Date(selectedFarda.createdAt).toLocaleDateString('pt-BR')
+                        ? new Date(selectedFarda.createdAt).toLocaleDateString(
+                            'pt-BR'
+                          )
                         : 'N/A'}
                     </div>
                     <div className="text-xs text-gray-400 mt-1">Cadastro</div>
