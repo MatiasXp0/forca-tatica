@@ -1,126 +1,60 @@
-import React from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
-import { 
-  Home, 
-  Truck, 
-  Shirt, 
-  Users, 
-  FileText, 
-  ChevronLeft, 
-  ChevronRight,
-  Shield,
-  Settings,
-  HelpCircle
-} from 'lucide-react';
+import React, { useState } from 'react';
+import { Sidebar } from './Sidebar';
+import { LogOut, UserCog } from 'lucide-react';
+import { signOut } from 'firebase/auth';
+import { auth } from '../firebaseConfig';
 
-export const Sidebar = ({ collapsed, toggleSidebar, user, isAdmin }) => {
-  const navigate = useNavigate();
+export const Layout = ({ children, user, isAdmin }) => {
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-  const navItems = [
-    { path: '/', icon: <Home size={20} />, label: 'Comunicados' },
-    { path: '/viaturas', icon: <Truck size={20} />, label: 'Viaturas' },
-    { path: '/fardamento', icon: <Shirt size={20} />, label: 'Fardamentos' },
-    { path: '/hierarquia', icon: <Users size={20} />, label: 'Hierarquia' },
-  ];
+  const toggleSidebar = () => setSidebarCollapsed(!sidebarCollapsed);
 
   return (
-    <aside 
-      className={`
-        h-screen bg-gradient-to-b from-gray-800 to-gray-900 
-        border-r border-blue-500/30 flex flex-col
-        transition-all duration-300 ease-in-out
-        ${collapsed ? 'w-20' : 'w-64'}
-      `}
-    >
-      {/* Logo e toggle */}
-      <div className={`
-        p-4 flex items-center border-b border-blue-500/20
-        ${collapsed ? 'justify-center' : 'justify-between'}
-      `}>
-        {!collapsed && (
-          <div className="flex items-center gap-2">
-            <Shield size={24} className="text-blue-400" />
-            <span className="font-bold text-white">FT-PMESP</span>
-          </div>
-        )}
-        {collapsed && (
-          <Shield size={28} className="text-blue-400" />
-        )}
-        
-        <button
-          onClick={toggleSidebar}
-          className="hidden lg:block p-1 rounded-lg hover:bg-gray-700 transition text-gray-400 hover:text-white"
-        >
-          {collapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
-        </button>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white font-sans">
+      <div className="flex">
+        {/* Sidebar */}
+        <Sidebar
+          collapsed={sidebarCollapsed}
+          toggleSidebar={toggleSidebar}
+          user={user}
+          isAdmin={isAdmin}
+        />
 
-      {/* Navegação */}
-      <nav className="flex-1 p-4 space-y-2 overflow-y-auto no-scrollbar">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            className={({ isActive }) => `
-              flex items-center gap-3 p-3 rounded-lg transition-all
-              ${isActive 
-                ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' 
-                : 'text-gray-400 hover:bg-gray-700/50 hover:text-white border border-transparent'
-              }
-              ${collapsed ? 'justify-center' : ''}
-            `}
-            title={collapsed ? item.label : ''}
-          >
-            <span className="shrink-0">{item.icon}</span>
-            {!collapsed && (
-              <span className="font-medium truncate">{item.label}</span>
-            )}
-          </NavLink>
-        ))}
-      </nav>
-
-      {/* Rodapé */}
-      <div className={`
-        p-4 border-t border-blue-500/20
-        ${collapsed ? 'text-center' : ''}
-      `}>
-        {!collapsed ? (
-          <>
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-8 h-8 rounded-full bg-blue-500/20 border border-blue-500/30 flex items-center justify-center">
-                <span className="text-blue-400 font-bold text-sm">
-                  {user?.email?.charAt(0).toUpperCase() || 'U'}
-                </span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-white truncate">
-                  {user?.email?.split('@')[0] || 'Usuário'}
-                </p>
-                <p className="text-xs text-gray-400 truncate">
-                  {user?.email || ''}
+        {/* Conteúdo principal */}
+        <main className="flex-1 min-h-screen flex flex-col">
+          {/* Header */}
+          <header className="bg-gradient-to-r from-gray-800 to-gray-900 border-b border-blue-500/20 p-4">
+            <div className="flex justify-between items-center">
+              <div>
+                <h1 className="text-xl font-bold">FORÇA TÁTICA - PMESP</h1>
+                <p className="text-blue-300 text-xs font-semibold">
+                  Sistema de Comunicados Operacionais
                 </p>
               </div>
-            </div>
-            
-            {isAdmin && (
-              <div className="text-xs text-yellow-400 bg-yellow-500/20 px-2 py-1 rounded text-center">
-                Administrador
+              <div className="flex items-center gap-4">
+                {isAdmin && (
+                  <span className="flex items-center gap-2 bg-yellow-500/20 text-yellow-400 px-3 py-1 rounded-lg text-xs font-bold">
+                    <UserCog size={12} /> ADMIN
+                  </span>
+                )}
+                <button
+                  onClick={() => signOut(auth)}
+                  className="bg-red-500/20 hover:bg-red-500/30 text-red-400 hover:text-red-300 px-4 py-2 rounded-lg font-semibold transition border border-red-500/30 flex items-center gap-2"
+                >
+                  <LogOut size={16} /> Sair
+                </button>
               </div>
-            )}
-          </>
-        ) : (
-          <div className="flex flex-col items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-blue-500/20 border border-blue-500/30 flex items-center justify-center">
-              <span className="text-blue-400 font-bold text-sm">
-                {user?.email?.charAt(0).toUpperCase() || 'U'}
-              </span>
             </div>
-            {isAdmin && (
-              <div className="w-2 h-2 rounded-full bg-yellow-400" title="Admin" />
-            )}
+          </header>
+
+          {/* Conteúdo dinâmico */}
+          <div className="flex-1 p-6">
+            <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-blue-500/20 rounded-xl p-6 fade-in">
+              {children}
+            </div>
           </div>
-        )}
+        </main>
       </div>
-    </aside>
+    </div>
   );
 };
