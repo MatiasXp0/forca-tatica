@@ -11,6 +11,7 @@ import {
 } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
 import { Car, Plus, Edit, Trash2, Save, X } from 'lucide-react';
+import { sendDiscordNotification } from '../utils/discordWebhooks';
 
 export const Viaturas = ({ isAdmin }) => {
   const [viaturas, setViaturas] = useState([]);
@@ -33,23 +34,23 @@ export const Viaturas = ({ isAdmin }) => {
   }, []);
 
   useEffect(() => {
-  const handleEsc = (e) => {
-    if (e.key === 'Escape' && isModalOpen) {
-      setModalOpen(false);
-      setEditingViatura(null);
-      setFormData({
-        nome: '',
-        modelo: '',
-        velocidadeMax: '',
-        descricao: '',
-        fotoURL: '',
-      });
-    }
-  };
+    const handleEsc = (e) => {
+      if (e.key === 'Escape' && isModalOpen) {
+        setModalOpen(false);
+        setEditingViatura(null);
+        setFormData({
+          nome: '',
+          modelo: '',
+          velocidadeMax: '',
+          descricao: '',
+          fotoURL: '',
+        });
+      }
+    };
 
-  window.addEventListener('keydown', handleEsc);
-  return () => window.removeEventListener('keydown', handleEsc);
-}, [isModalOpen]);
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [isModalOpen]);
 
   const handleSave = async () => {
     if (!formData.nome || !formData.modelo) {
@@ -69,6 +70,10 @@ export const Viaturas = ({ isAdmin }) => {
       } else {
         await addDoc(collection(db, 'viaturas'), viaturaData);
       }
+      if (!editingViatura) {
+        await sendDiscordNotification('viaturas', viaturaData);
+      }
+
       setModalOpen(false);
       setEditingViatura(null);
       setFormData({
