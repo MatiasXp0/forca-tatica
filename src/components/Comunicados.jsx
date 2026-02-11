@@ -345,30 +345,29 @@ const Comunicados = ({ isAdmin }) => {
 
   // ========== TOGGLE URGENTE ==========
   const toggleComUrgente = async (com) => {
-    try {
-      await updateDoc(doc(db, 'comunicados', com.id), {
-        isUrgente: !com.isUrgente,
-        updatedAt: new Date(),
-      });
+  try {
+    const novoStatus = !com.isUrgente;
+    
+    await updateDoc(doc(db, 'comunicados', com.id), {
+      isUrgente: novoStatus,
+      updatedAt: new Date(),
+    });
 
-      if (com.discordMessageId) {
-        await upsertDiscordMessage('comunicados', com.id, {
-          ...com,
-          isUrgente: !com.isUrgente,
-          discordMessageId: com.discordMessageId,
-        });
-      }
-
-      console.log(
-        `⚠️ Comunicado ${com.titulo} ${
-          !com.isUrgente ? 'marcado como urgente' : 'urgência removida'
-        }`
-      );
-    } catch (error) {
-      console.error('Erro ao alterar urgência:', error);
-      alert('Erro ao alterar urgência. Tente novamente.');
+    // ✅ ATUALIZAR DISCORD
+    if (com.discordMessageId) {
+      await upsertDiscordMessage('comunicados', com.id, {
+        ...com,
+        isUrgente: novoStatus,
+        discordMessageId: com.discordMessageId
+      }, 'urgente');  // 👈 ENVIAR COMO URGENTE
     }
-  };
+
+    console.log(`${novoStatus ? '⚠️' : '📋'} Comunicado ${com.titulo} - Urgente: ${novoStatus ? 'SIM' : 'NÃO'}`);
+  } catch (error) {
+    console.error('Erro ao alterar urgência:', error);
+    alert('Erro ao alterar urgência. Tente novamente.');
+  }
+};
 
   // ========== FORMATAR DATA ==========
   const formatDate = (date) => {
