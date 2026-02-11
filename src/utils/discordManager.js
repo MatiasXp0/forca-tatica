@@ -239,23 +239,44 @@ class DiscordManager {
   }
 
   // ========== FARDAMENTOS ==========
-  // Cria o embed para fardamento (reutilizado na criação e edição)
+  // ========== EMBED DE FARDAMENTO (COM TEXTURA, DESCRIÇÃO E DIVISÃO AUTOMÁTICA) ==========
   _createFardamentoEmbed(fardamento) {
     const url = `https://forca-tatica.vercel.app/fardamento`;
 
-    // Monta o texto com TODAS as peças
+    // --- Monta a lista de peças com TODAS as informações ---
     let pecasTexto = '';
     if (fardamento.pecas && fardamento.pecas.length > 0) {
       pecasTexto = fardamento.pecas
         .map((p, i) => {
+          // 1) Caso a peça seja uma STRING (dados antigos)
           if (typeof p === 'string') {
-            return `${i + 1}. ${p.split('|')[0].trim()}`;
+            const partes = p.split('|').map((s) => s.trim());
+            const principal = partes[0] || ''; // Ex: "MASCARA 273"
+
+            // Extrai textura (TXT 272) se existir
+            const texturaMatch =
+              p.match(/txt\s*(\d+)/i) || p.match(/textura\s*(\d+)/i);
+            const textura = texturaMatch ? ` · TXT ${texturaMatch[1]}` : '';
+
+            // O resto é descrição (junta tudo que sobrou)
+            const descricao = partes.slice(1).join(' | ').trim();
+            const descricaoFormatada = descricao ? ` — ${descricao}` : '';
+
+            return `${i + 1}. ${principal}${textura}${descricaoFormatada}`;
           }
-          return `${i + 1}. ${p.tipo} ${p.numero || ''}`;
+
+          // 2) Caso a peça seja um OBJETO (formato atual)
+          const tipo = p.tipo?.toUpperCase() || '';
+          const numero = p.numero || '';
+          const textura = p.textura ? ` · TXT ${p.textura}` : '';
+          const descricao = p.descricao ? ` — ${p.descricao}` : '';
+
+          return `${i + 1}. ${tipo} ${numero}${textura}${descricao}`;
         })
         .join('\n');
     }
 
+    // --- Embed base ---
     const embed = {
       title: `👕 ${
         fardamento.discordMessageId
@@ -283,12 +304,11 @@ class DiscordManager {
       },
     };
 
-    // ----- TRATAMENTO DA LISTA DE PEÇAS (DINÂMICO) -----
+    // --- Divisão automática da lista de peças em múltiplos fields (respeita limite de 1024 caracteres) ---
     if (pecasTexto) {
       const MAX_FIELD_VALUE = 1024;
 
-      // Função para dividir string em partes de até MAX_FIELD_VALUE caracteres
-      const dividirEmPartes = (texto, tamanho) => {
+      const dividirTexto = (texto, tamanho) => {
         const partes = [];
         for (let i = 0; i < texto.length; i += tamanho) {
           partes.push(texto.substring(i, i + tamanho));
@@ -296,9 +316,8 @@ class DiscordManager {
         return partes;
       };
 
-      const partes = dividirEmPartes(pecasTexto, MAX_FIELD_VALUE);
+      const partes = dividirTexto(pecasTexto, MAX_FIELD_VALUE);
 
-      // Adiciona um field para cada parte
       partes.forEach((parte, index) => {
         embed.fields.push({
           name: `📋 COMPOSIÇÃO ${
@@ -310,7 +329,7 @@ class DiscordManager {
       });
     }
 
-    // ----- FOTO -----
+    // --- Foto (se houver) ---
     if (fardamento.fotoURL) {
       embed.image = { url: fardamento.fotoURL };
       embed.thumbnail = { url: fardamento.fotoURL };
