@@ -19,9 +19,9 @@ import {
   deleteDiscordMessage,
 } from '../utils/discordManager';
 
-// Componente de imagem com fallback elegante
+// Componente de imagem com fallback elegante (CORRIGIDO)
 const FardaImage = ({ farda, size = 'medium' }) => {
-  const colors = getFardaColor(farda.nome);
+  const [imgError, setImgError] = useState(false);
 
   const sizeClasses = {
     small: 'w-16 h-16 sm:w-20 sm:h-20',
@@ -29,29 +29,22 @@ const FardaImage = ({ farda, size = 'medium' }) => {
     large: 'w-32 h-32 sm:w-36 sm:h-36 md:w-44 md:h-44',
   };
 
+  const iconSize = size === 'large' ? 44 : size === 'medium' ? 32 : 24;
+
   return (
     <div
       className={`${sizeClasses[size]} flex-shrink-0 rounded-xl bg-gradient-to-br from-gray-800/50 to-gray-900/50 flex items-center justify-center relative overflow-hidden border border-gray-700/50 shadow-md`}
     >
-      {farda.fotoURL ? (
+      {!imgError && farda.fotoURL ? (
         <img
           src={farda.fotoURL}
           alt={farda.nome}
           className="w-full h-full object-contain transition-transform duration-300 hover:scale-110"
-          onError={(e) => {
-            e.target.onerror = null;
-            e.target.src = '';
-            e.target.alt = 'Erro';
-            e.target.parentElement.innerHTML = `
-              <div class="w-full h-full flex items-center justify-center">
-                <ImageOff size=${size === 'large' ? 36 : 24} class="text-gray-500" />
-              </div>
-            `;
-          }}
+          onError={() => setImgError(true)}
         />
       ) : (
         <div className="w-full h-full flex items-center justify-center">
-          <Shirt size={size === 'large' ? 44 : size === 'medium' ? 32 : 24} className="text-gray-500" />
+          <ImageOff size={iconSize} className="text-gray-500" />
         </div>
       )}
     </div>
@@ -416,8 +409,8 @@ const Fardamentos = ({ isAdmin }) => {
           </div>
         </div>
 
-        {/* === COLUNA DIREITA - COMPOSIÇÃO === */}
-        <div className="w-full lg:w-5/12 xl:w-4/12">
+        {/* === COLUNA DIREITA - COMPOSIÇÃO === (INDENTAÇÃO CORRIGIDA) */}
+        <div className="w-full lg:w-6/12 xl:w-5/12">
           <div className="bg-gradient-to-b from-gray-800/40 to-gray-900/40 backdrop-blur-sm border border-blue-500/20 rounded-2xl p-5 lg:p-6 xl:p-7 flex flex-col w-full h-full shadow-xl min-h-[400px] lg:min-h-[600px]">
             {selectedFarda ? (
               <>
@@ -433,7 +426,7 @@ const Fardamentos = ({ isAdmin }) => {
                   </div>
                   <h3 className="text-lg lg:text-xl font-bold text-white mb-2">{selectedFarda.nome}</h3>
                   {selectedFarda.descricao && (
-                    <div className="bg-gray-900/60 rounded-lg p-3 mb-2 text-sm lg:text-base text-gray-300 border border-gray-700/50">
+                    <div className="bg-gray-900/60 rounded-lg p-3 mb-2 text-sm lg:text-base text-gray-300 border border-gray-700/50 break-words">
                       {selectedFarda.descricao}
                     </div>
                   )}
@@ -457,7 +450,7 @@ const Fardamentos = ({ isAdmin }) => {
                   </div>
                 </div>
 
-                {/* Lista de peças - SCROLL SUAVE */}
+                {/* Lista de peças - COM QUEBRA DE LINHA OTIMIZADA */}
                 <div className="flex-1 flex flex-col overflow-hidden">
                   <h4 className="font-semibold text-gray-300 mb-3 flex items-center gap-2 text-sm lg:text-base border-b border-gray-700/80 pb-2">
                     <Layers size={18} className="text-blue-400" />
@@ -476,20 +469,21 @@ const Fardamentos = ({ isAdmin }) => {
                             >
                               <span className="text-sm lg:text-base font-bold text-white">{index + 1}</span>
                             </div>
-                            <div className="flex-1">
-                              <h5 className="font-semibold text-white text-sm lg:text-base">
+                            {/* min-w-0 + break-words garantem quebra adequada */}
+                            <div className="flex-1 min-w-0">
+                              <h5 className="font-semibold text-white text-sm lg:text-base break-words">
                                 {typeof peca === 'string'
                                   ? peca.split('|')[0].trim()
                                   : `${peca.tipo?.toUpperCase() || ''} ${peca.numero || ''}${peca.textura ? ` · TXT ${peca.textura}` : ''}`}
                               </h5>
                               {typeof peca === 'string'
                                 ? peca.split('|').slice(1).join(' | ') && (
-                                    <p className="text-xs lg:text-sm text-gray-400 mt-1 line-clamp-2">
+                                    <p className="text-xs lg:text-sm text-gray-400 mt-1 whitespace-pre-wrap break-words">
                                       {peca.split('|').slice(1).join(' | ').trim()}
                                     </p>
                                   )
                                 : peca.descricao && (
-                                    <p className="text-xs lg:text-sm text-gray-400 mt-1 line-clamp-2">
+                                    <p className="text-xs lg:text-sm text-gray-400 mt-1 whitespace-pre-wrap break-words">
                                       {peca.descricao}
                                     </p>
                                   )}
