@@ -61,3 +61,48 @@
 img.object-cover {
   object-fit: cover !important;
 }
+
+/* ========== NOVAS CORREÇÕES – RESPONSIVIDADE E FUNDO ========== */
+
+/* Garantir fundo escuro em toda a aplicação */
+html, body, #root {
+  background-color: #0a0c0f;
+  min-height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+/* Evitar overflow horizontal e scroll indesejado */
+* {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Imagens e mídia responsivas */
+img, video, iframe {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Melhorar toque em mobile e remover brilho ao clicar */
+button, a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Garantir que o conteúdo principal não cause overflow */
+main, .content-wrapper {
+  overflow-x: hidden;
+  width: 100%;
+}
+
+/* Ajuste para telas muito pequenas (ex: iPhone SE) */
+@media (max-width: 375px) {
+  html {
+    font-size: 14px;
+  }
+  
+  .farda-image-container {
+    border-radius: 8px;
+  }
+}
