@@ -19,7 +19,7 @@ import {
   deleteDiscordMessage,
 } from '../utils/discordManager';
 
-// Componente de imagem com fallback elegante (CORRIGIDO)
+// Componente de imagem com fallback elegante
 const FardaImage = ({ farda, size = 'medium' }) => {
   const [imgError, setImgError] = useState(false);
 
@@ -120,13 +120,22 @@ const Fardamentos = ({ isAdmin }) => {
     };
 
     try {
-      let discordMessageId = null;
-
       if (editingFarda) {
+        // 🔹 EDIÇÃO: Firebase + Discord (ATUALIZA mensagem existente)
         await updateDoc(doc(db, 'fardamentos', editingFarda.id), fardaData);
+        
+        // ✅ Atualiza a mensagem no Discord se existir
+        if (editingFarda.discordMessageId) {
+          await upsertDiscordMessage('fardamentos', editingFarda.id, {
+            ...fardaData,
+            id: editingFarda.id,
+            discordMessageId: editingFarda.discordMessageId,
+          });
+        }
       } else {
+        // 🔹 CRIAÇÃO: Firebase + Discord
         const docRef = await addDoc(collection(db, 'fardamentos'), fardaData);
-        discordMessageId = await upsertDiscordMessage('fardamentos', docRef.id, {
+        const discordMessageId = await upsertDiscordMessage('fardamentos', docRef.id, {
           ...fardaData,
           id: docRef.id,
         });
@@ -299,21 +308,21 @@ const Fardamentos = ({ isAdmin }) => {
 
             {/* Lista de fardamentos - SCROLL OTIMIZADO */}
             <div className="flex-1 overflow-hidden">
-              {fardamentos.length === 0 ? (
-                <div className="text-center py-12 lg:py-16">
-                  <div className="w-20 h-20 lg:w-24 lg:h-24 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 flex items-center justify-center">
-                    <Shirt size={40} className="lg:w-12 lg:h-12 text-gray-600" />
+              <div className="h-full overflow-y-auto pr-2 lg:pr-3 space-y-3 lg:space-y-2">
+                {fardamentos.length === 0 ? (
+                  <div className="text-center py-12 lg:py-16">
+                    <div className="w-20 h-20 lg:w-24 lg:h-24 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 flex items-center justify-center">
+                      <Shirt size={40} className="lg:w-12 lg:h-12 text-gray-600" />
+                    </div>
+                    <p className="text-gray-400 text-base lg:text-lg">Nenhum fardamento cadastrado</p>
+                    {isAdmin && (
+                      <p className="text-xs lg:text-sm text-gray-500 mt-2">
+                        Clique em "Novo Fardamento" para adicionar
+                      </p>
+                    )}
                   </div>
-                  <p className="text-gray-400 text-base lg:text-lg">Nenhum fardamento cadastrado</p>
-                  {isAdmin && (
-                    <p className="text-xs lg:text-sm text-gray-500 mt-2">
-                      Clique em "Novo Fardamento" para adicionar
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-3 lg:space-y-2 max-h-[calc(100vh-280px)] lg:max-h-[calc(100vh-240px)] overflow-y-auto pr-2 lg:pr-3 scroll-smooth">
-                  {fardamentos.map((farda) => {
+                ) : (
+                  fardamentos.map((farda) => {
                     const colors = getFardaColor(farda.nome);
                     const isSelected = selectedFarda?.id === farda.id;
                     return (
@@ -402,14 +411,14 @@ const Fardamentos = ({ isAdmin }) => {
                         )}
                       </div>
                     );
-                  })}
-                </div>
-              )}
+                  })
+                )}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* === COLUNA DIREITA - COMPOSIÇÃO === (INDENTAÇÃO CORRIGIDA) */}
+        {/* === COLUNA DIREITA - COMPOSIÇÃO === */}
         <div className="w-full lg:w-6/12 xl:w-5/12">
           <div className="bg-gradient-to-b from-gray-800/40 to-gray-900/40 backdrop-blur-sm border border-blue-500/20 rounded-2xl p-5 lg:p-6 xl:p-7 flex flex-col w-full h-full shadow-xl min-h-[400px] lg:min-h-[600px]">
             {selectedFarda ? (
@@ -469,7 +478,6 @@ const Fardamentos = ({ isAdmin }) => {
                             >
                               <span className="text-sm lg:text-base font-bold text-white">{index + 1}</span>
                             </div>
-                            {/* min-w-0 + break-words garantem quebra adequada */}
                             <div className="flex-1 min-w-0">
                               <h5 className="font-semibold text-white text-sm lg:text-base break-words">
                                 {typeof peca === 'string'
@@ -776,7 +784,7 @@ const Fardamentos = ({ isAdmin }) => {
           </div>
         </div>
       )}
-    </div>  
+    </div>
   );
 };
 
