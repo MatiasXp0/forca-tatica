@@ -1,9 +1,12 @@
-/* Estilos personalizados para o sistema */
+/* ========== ESTILOS EXCLUSIVOS PARA FARDAMENTOS ========== */
+
+/* Modal principal */
 .modal-fardamento-grande {
-  max-width: 900px !important;
-  width: 95vw;
+  width: 95vw !important;
+  max-width: 1400px;
 }
 
+/* Cards de peças */
 .card-peca-grande {
   min-height: 200px;
   transition: all 0.3s ease;
@@ -14,36 +17,19 @@
   transform: translateY(-2px);
 }
 
+/* Botões grandes (desktop) */
 .botao-grande {
   padding: 14px 28px;
   font-size: 1.1rem;
   font-weight: 600;
 }
 
-/* Estilos de scrollbar personalizados */
-::-webkit-scrollbar {
-  width: 10px;
-}
-
-::-webkit-scrollbar-track {
-  background: rgba(31, 41, 55, 0.3);
-}
-
-::-webkit-scrollbar-thumb {
-  background: rgba(59, 130, 246, 0.5);
-  border-radius: 5px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(59, 130, 246, 0.7);
-}
-
-/* Otimização para modais */
+/* Overlay de modal */
 .modal-overlay {
   backdrop-filter: blur(4px);
 }
 
-/* Animação para cards */
+/* Animação fade-in */
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -59,7 +45,7 @@
   animation: fadeIn 0.3s ease-out;
 }
 
-/* Estilos para preview de imagem */
+/* Preview de imagem */
 .image-preview {
   position: relative;
   overflow: hidden;
@@ -72,32 +58,11 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(
-    to bottom,
-    rgba(0, 0, 0, 0.1) 0%,
-    rgba(0, 0, 0, 0.3) 100%
-  );
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.3));
   pointer-events: none;
 }
 
-/* Melhorias para responsividade */
-@media (max-width: 768px) {
-  .modal-fardamento-grande {
-    width: 98vw !important;
-    padding: 1rem !important;
-  }
-
-  .card-peca-grande {
-    min-height: auto;
-  }
-
-  .botao-grande {
-    padding: 10px 20px;
-    font-size: 1rem;
-  }
-}
-
-/* Estilos para tooltips da sidebar */
+/* Tooltips da sidebar (mantido, se usado) */
 .sidebar-tooltip {
   position: relative;
 }
@@ -124,4 +89,32 @@
 .sidebar-tooltip:hover::before {
   opacity: 1;
   visibility: visible;
+}
+
+/* ========== RESPONSIVIDADE ========== */
+@media (max-width: 640px) {
+  .modal-fardamento-grande {
+    width: 100vw !important;
+    padding: 1rem !important;
+    border-radius: 0.75rem;
+  }
+
+  .card-peca-grande {
+    min-height: auto;
+  }
+
+  .botao-grande {
+    padding: 10px 20px;
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 375px) {
+  .farda-image-container {
+    border-radius: 8px;
+  }
+
+  .modal-fardamento-grande {
+    padding: 0.75rem !important;
+  }
 }
