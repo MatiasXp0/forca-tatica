@@ -58,6 +58,7 @@ export const Sidebar = ({ collapsed, toggleSidebar, user, isAdmin }) => {
         collapsed ? 'w-16' : 'w-56'
       } bg-gray-800/30 border-r border-blue-500/20 transition-all duration-300 h-screen sticky top-0`}
     >
+      {/* Cabeçalho com logo e botão recolher */}
       <div className="p-4 border-b border-blue-500/20">
         <div className="flex items-center justify-between">
           {!collapsed && (
@@ -76,6 +77,7 @@ export const Sidebar = ({ collapsed, toggleSidebar, user, isAdmin }) => {
         </div>
       </div>
 
+      {/* Navegação principal */}
       <nav className="p-2 space-y-1">
         <SidebarLink
           to="/"
@@ -102,6 +104,7 @@ export const Sidebar = ({ collapsed, toggleSidebar, user, isAdmin }) => {
           collapsed={collapsed}
         />
 
+        {/* Ferramentas externas */}
         <div className="pt-4">
           <p
             className={`text-xs text-gray-500 px-3 mb-2 ${
@@ -119,6 +122,7 @@ export const Sidebar = ({ collapsed, toggleSidebar, user, isAdmin }) => {
         </div>
       </nav>
 
+      {/* Rodapé com informações do usuário */}
       <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-700/50">
         <div className="flex items-center gap-3">
           <div className="bg-blue-500/20 p-2 rounded-lg">
