@@ -48,99 +48,113 @@ class DiscordManager {
 
   // ========== MÉTODOS PRINCIPAIS ==========
 
-  // HIERARQUIA - LISTA COMPLETA
-  async syncHierarquiaLista(membros) {
-    const webhookUrl = this.webhooks.hierarquia;
-    if (!webhookUrl) {
-      this._log('error', '❌ Webhook hierarquia não configurado');
-      return null;
-    }
-
-    // Ordenar por patente
-    const membrosOrdenados = [...membros].sort((a, b) => 
-      this.ordemPatentes.indexOf(a.patente) - this.ordemPatentes.indexOf(b.patente)
-    );
-
-    // Agrupar por patente
-    const agrupado = {};
-    membrosOrdenados.forEach(membro => {
-      if (!agrupado[membro.patente]) agrupado[membro.patente] = [];
-      agrupado[membro.patente].push(membro);
-    });
-
-    // Criar descrição formatada
-    let description = '';
-    
-    this.ordemPatentes.forEach(patente => {
-      const membrosPatente = agrupado[patente] || [];
-      if (membrosPatente.length === 0) return;
-      
-      description += `**${patente}** ${membrosPatente.length > 1 ? `(${membrosPatente.length})` : ''}\n`;
-      
-      membrosPatente.forEach(m => {
-        const status = m.ativo ? '✅' : '❌';
-        const advertencias = m.advertências?.filter(a => a.tipo === 'advertencia').length || 0;
-        const emojiAdvertencia = advertencias > 0 ? '⚠️' : '✨';
-        
-        description += `${status} **${m.nome}** - ${emojiAdvertencia} ${advertencias}/3\n`;
-        
-        // Última atividade
-        if (m.advertências?.length > 0) {
-          const ultima = m.advertências[m.advertências.length - 1];
-          const data = ultima.dataInicio?.split('-').reverse().join('/') || 'N/I';
-          const motivo = ultima.motivo?.substring(0, 30) || '';
-          description += `└ 🕐 ${ultima.tipo}: ${motivo}${motivo.length > 30 ? '...' : ''} (${data})\n`;
-        }
-      });
-      description += '\n';
-    });
-
-    // Limitar tamanho (Discord: 4096 caracteres)
-    if (description.length > 4000) {
-      description = description.substring(0, 3990) + '...\n\n*(Lista truncada)*';
-    }
-
-    const embed = {
-      title: '🎖️ HIERARQUIA DO BATALHÃO',
-      description: description || 'Nenhum membro cadastrado',
-      color: 0x003366,
-      fields: [
-        {
-          name: '📊 ESTATÍSTICAS',
-          value: `👥 **Total:** ${membros.length} membros\n✅ **Ativos:** ${membros.filter(m => m.ativo).length}\n⚠️ **Advertências:** ${membros.reduce((acc, m) => acc + (m.advertências?.filter(a => a.tipo === 'advertencia').length || 0), 0)}`,
-          inline: false
-        },
-        {
-          name: '🔗 ACESSO RÁPIDO',
-          value: '[📋 Ver Hierarquia Completa](https://forca-tatica.vercel.app/hierarquia) | [➕ Novo Membro](https://forca-tatica.vercel.app/hierarquia?novo)',
-          inline: false
-        }
-      ],
-      timestamp: new Date().toISOString(),
-      footer: {
-        text: 'Força Tática PMESP • Atualizado em tempo real',
-        icon_url: 'https://forca-tatica.vercel.app/favicon.ico'
-      }
-    };
-
-    try {
-      const mensagemId = await this._getMensagemHierarquia();
-      
-      if (mensagemId) {
-        await this._editMessage(webhookUrl, mensagemId, embed);
-        this._log('success', '✅ Hierarquia atualizada no Discord');
-        return mensagemId;
-      } else {
-        const novaMensagemId = await this._sendMessage(webhookUrl, embed);
-        await this._salvarMensagemHierarquia(novaMensagemId);
-        this._log('success', '✅ Hierarquia publicada no Discord');
-        return novaMensagemId;
-      }
-    } catch (error) {
-      this._log('error', '❌ Erro ao sincronizar hierarquia:', error);
-      return null;
-    }
+  // HIERARQUIA - LISTA COMPLETA (CORRIGIDO)
+async syncHierarquiaLista(membros) {
+  const webhookUrl = this.webhooks.hierarquia;
+  if (!webhookUrl) {
+    this._log('error', '❌ Webhook hierarquia não configurado');
+    return null;
   }
+
+  // Ordenar por patente
+  const membrosOrdenados = [...membros].sort((a, b) => 
+    this.ordemPatentes.indexOf(a.patente) - this.ordemPatentes.indexOf(b.patente)
+  );
+
+  // Agrupar por patente
+  const agrupado = {};
+  membrosOrdenados.forEach(membro => {
+    if (!agrupado[membro.patente]) agrupado[membro.patente] = [];
+    agrupado[membro.patente].push(membro);
+  });
+
+  // Criar descrição formatada
+  let description = '';
+  
+  this.ordemPatentes.forEach(patente => {
+    const membrosPatente = agrupado[patente] || [];
+    if (membrosPatente.length === 0) return;
+    
+    description += `**${patente}** ${membrosPatente.length > 1 ? `(${membrosPatente.length})` : ''}\n`;
+    
+    membrosPatente.forEach(m => {
+      const status = m.ativo ? '✅' : '❌';
+      const advertencias = m.advertências?.filter(a => a.tipo === 'advertencia').length || 0;
+      
+      // ✨ REMOVIDO - Agora só mostra o número sem emoji
+      description += `${status} **${m.nome}** - ${advertencias}/3\n`;
+      
+      // Mostrar [INATIVO] na frente se estiver inativo
+      if (!m.ativo) {
+        description += `└ ⚠️ **INATIVO**\n`;
+      }
+      
+      // Última atividade
+      if (m.advertências?.length > 0) {
+        const ultima = m.advertências[m.advertências.length - 1];
+        const data = ultima.dataInicio?.split('-').reverse().join('/') || 'N/I';
+        const motivo = ultima.motivo?.substring(0, 30) || '';
+        description += `└ 🕐 ${ultima.tipo}: ${motivo}${motivo.length > 30 ? '...' : ''} (${data})\n`;
+      }
+    });
+    description += '\n';
+  });
+
+  // Limitar tamanho (Discord: 4096 caracteres)
+  if (description.length > 4000) {
+    description = description.substring(0, 3990) + '...\n\n*(Lista truncada)*';
+  }
+
+  // 📊 ESTATÍSTICAS COM INATIVOS
+  const totalMembros = membros.length;
+  const ativos = membros.filter(m => m.ativo).length;
+  const inativos = totalMembros - ativos;
+  const totalAdvertencias = membros.reduce((acc, m) => 
+    acc + (m.advertências?.filter(a => a.tipo === 'advertencia').length || 0), 0
+  );
+
+  const embed = {
+    title: '🎖️ HIERARQUIA DO BATALHÃO',
+    description: description || 'Nenhum membro cadastrado',
+    color: 0x003366,
+    fields: [
+      {
+        name: '📊 ESTATÍSTICAS',
+        value: `👥 **Total:** ${totalMembros} membros\n✅ **Ativos:** ${ativos}\n❌ **Inativos:** ${inativos}\n⚠️ **Advertências:** ${totalAdvertencias}`,
+        inline: false
+      },
+      {
+        name: '🔗 ACESSO RÁPIDO',
+        // ✅ LINK CORRIGIDO COM ?novo
+        value: '[📋 Ver Hierarquia Completa](https://forca-tatica.vercel.app/hierarquia) | [➕ Novo Membro](https://forca-tatica.vercel.app/hierarquia?novo)',
+        inline: false
+      }
+    ],
+    timestamp: new Date().toISOString(),
+    footer: {
+      text: 'Força Tática PMESP • Atualizado em tempo real',
+      icon_url: 'https://forca-tatica.vercel.app/favicon.ico'
+    }
+  };
+
+  try {
+    const mensagemId = await this._getMensagemHierarquia();
+    
+    if (mensagemId) {
+      await this._editMessage(webhookUrl, mensagemId, embed);
+      this._log('success', '✅ Hierarquia atualizada no Discord');
+      return mensagemId;
+    } else {
+      const novaMensagemId = await this._sendMessage(webhookUrl, embed);
+      await this._salvarMensagemHierarquia(novaMensagemId);
+      this._log('success', '✅ Hierarquia publicada no Discord');
+      return novaMensagemId;
+    }
+  } catch (error) {
+    this._log('error', '❌ Erro ao sincronizar hierarquia:', error);
+    return null;
+  }
+}
 
   // VIATURAS
   async syncViatura(viatura, action = 'upsert') {
