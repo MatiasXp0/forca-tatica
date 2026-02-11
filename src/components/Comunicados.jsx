@@ -760,7 +760,7 @@ const Comunicados = ({ isAdmin }) => {
                             🔗 LINK DIRETO PARA ESTE COMUNICADO
                           </span>
                           <span className="text-xs text-gray-400 font-mono break-all">
-                            https://forca-tatica.vercel.app/comunicados?id=
+                            https://forca-tatica.vercel.app/
                             {com.id}
                           </span>
                         </div>
