@@ -1,8 +1,3 @@
-import {
-  upsertDiscordMessage,
-  deleteDiscordMessage,
-  sendDiscordLog,
-} from '../utils/discordSync';
 import React, { useState, useEffect } from 'react';
 import {
   collection,
@@ -33,7 +28,11 @@ import {
   EyeOff,
 } from 'lucide-react';
 import { getAdvertenciaColor } from './utils/fardaColors';
-import { sendDiscordNotification } from '../utils/discordWebhooks';
+import {
+  upsertDiscordMessage,
+  deleteDiscordMessage,
+  sendDiscordLog,
+} from '../utils/discordBotSystem';
 
 const Hierarquia = ({ isAdmin }) => {
   const [membros, setMembros] = useState([]);
@@ -125,12 +124,21 @@ const Hierarquia = ({ isAdmin }) => {
         const membroDoc = await getDoc(doc(db, 'hierarquia', id));
         const membroData = membroDoc.data();
 
+        if (!membroData) {
+          throw new Error('Membro não encontrado');
+        }
+
         // 🔄 Remover do Discord primeiro
         if (membroData?.discordMessageId) {
-          await deleteDiscordMessage('hierarquia', {
+          const deleted = await deleteDiscordMessage('hierarquia', {
             ...membroData,
             id: id,
+            discordMessageId: membroData.discordMessageId,
           });
+
+          if (!deleted) {
+            console.warn('Não foi possível remover a mensagem do Discord');
+          }
         }
 
         // Depois deletar do Firebase
@@ -144,7 +152,9 @@ const Hierarquia = ({ isAdmin }) => {
 
         // Log de remoção
         await sendDiscordLog(
-          `🗑️ Membro removido: **${membroData?.nome || 'Desconhecido'}**`,
+          `🗑️ Membro removido: **${membroData?.nome || 'Desconhecido'}** (${
+            membroData?.patente
+          })`,
           'warning'
         );
       } catch (error) {
@@ -172,24 +182,38 @@ const Hierarquia = ({ isAdmin }) => {
     };
 
     try {
+      let discordMessageId = null;
+
       if (editingMembro) {
         // Atualizar membro existente
         await updateDoc(doc(db, 'hierarquia', editingMembro.id), membroData);
 
         // 🔄 Sincronizar com Discord
-        await upsertDiscordMessage('hierarquia', editingMembro.id, {
-          ...membroData,
-          id: editingMembro.id,
-        });
+        discordMessageId = await upsertDiscordMessage(
+          'hierarquia',
+          editingMembro.id,
+          {
+            ...membroData,
+            id: editingMembro.id,
+            discordMessageId: editingMembro.discordMessageId, // Mantém o ID existente
+          }
+        );
       } else {
         // Criar novo membro
         const result = await addDoc(collection(db, 'hierarquia'), membroData);
 
-        // 🔄 Sincronizar com Discord
-        await upsertDiscordMessage('hierarquia', result.id, {
+        // 🔄 Sincronizar com Discord primeiro
+        discordMessageId = await upsertDiscordMessage('hierarquia', result.id, {
           ...membroData,
           id: result.id,
         });
+
+        // Atualizar no Firebase com o discordMessageId
+        if (discordMessageId) {
+          await updateDoc(doc(db, 'hierarquia', result.id), {
+            discordMessageId: discordMessageId,
+          });
+        }
       }
 
       setModalOpen(false);
