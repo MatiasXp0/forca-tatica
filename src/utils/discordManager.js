@@ -1,5 +1,6 @@
 // src/utils/discordManager.js
 // SISTEMA COMPLETO DE INTEGRAÇÃO COM DISCORD VIA WEBHOOKS
+// CORREÇÕES: Fardamentos (edição atualiza) e Comunicados (urgência atualiza)
 
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
@@ -161,379 +162,404 @@ class DiscordManager {
     }
   }
 
-       // ========== VIATURAS ==========
-async syncViatura(viatura, action = 'upsert') {
-  const webhookUrl = this.webhooks.viaturas;
-  if (!webhookUrl) {
-    this._log('error', '❌ Webhook viaturas não configurado');
-    return null;
-  }
-
-  const isDelete = action === 'delete';
-  const url = `https://forca-tatica.vercel.app/viaturas`; // ✅ LINK NORMAL
-
-  try {
-    if (isDelete) {
-      if (viatura.discordMessageId) {
-        await this._deleteMessage(webhookUrl, viatura.discordMessageId);
-        this._log('success', `🗑️ Viatura removida do Discord: ${viatura.nome}`);
-      }
-      return true;
+  // ========== VIATURAS ==========
+  async syncViatura(viatura, action = 'upsert') {
+    const webhookUrl = this.webhooks.viaturas;
+    if (!webhookUrl) {
+      this._log('error', '❌ Webhook viaturas não configurado');
+      return null;
     }
 
-    // SÓ CRIAÇÃO - EDIÇÃO NÃO GERA MENSAGEM
-    if (!isDelete && !viatura.discordMessageId) {
-      const embed = {
-        title: `🚗 NOVA VIATURA: ${viatura.nome}`,
-        description: viatura.descricao || 'Viatura operacional da Força Tática',
-        color: 0x3498db,
-        fields: [
-          {
-            name: '📋 MODELO',
-            value: viatura.modelo || 'Não informado',
-            inline: true,
+    const isDelete = action === 'delete';
+    const url = `https://forca-tatica.vercel.app/viaturas`;
+
+    try {
+      if (isDelete) {
+        if (viatura.discordMessageId) {
+          await this._deleteMessage(webhookUrl, viatura.discordMessageId);
+          this._log('success', `🗑️ Viatura removida do Discord: ${viatura.nome}`);
+        }
+        return true;
+      }
+
+      // SÓ CRIAÇÃO - EDIÇÃO NÃO GERA MENSAGEM (conforme solicitado)
+      if (!isDelete && !viatura.discordMessageId) {
+        const embed = {
+          title: `🚗 NOVA VIATURA: ${viatura.nome}`,
+          description: viatura.descricao || 'Viatura operacional da Força Tática',
+          color: 0x3498db,
+          fields: [
+            {
+              name: '📋 MODELO',
+              value: viatura.modelo || 'Não informado',
+              inline: true,
+            },
+            {
+              name: '⚡ VELOCIDADE',
+              value: viatura.velocidadeMax ? `${viatura.velocidadeMax} km/h` : 'N/I',
+              inline: true,
+            },
+            {
+              name: '🔗 ACESSO RÁPIDO',
+              value: `[🔍 Ver todas as viaturas](${url})`,
+              inline: false,
+            },
+          ],
+          timestamp: new Date().toISOString(),
+          footer: {
+            text: 'Força Tática PMESP',
+            icon_url: 'https://forca-tatica.vercel.app/favicon.ico',
           },
-          {
-            name: '⚡ VELOCIDADE',
-            value: viatura.velocidadeMax ? `${viatura.velocidadeMax} km/h` : 'N/I',
-            inline: true,
-          },
-          {
-            name: '🔗 ACESSO RÁPIDO',
-            value: `[🔍 Ver todas as viaturas](${url})`, // ✅ LINK NORMAL
-            inline: false,
-          },
-        ],
-        timestamp: new Date().toISOString(),
-        footer: {
-          text: 'Força Tática PMESP',
-          icon_url: 'https://forca-tatica.vercel.app/favicon.ico',
+        };
+
+        if (viatura.fotoURL) {
+          embed.image = { url: viatura.fotoURL };
+          embed.thumbnail = { url: viatura.fotoURL };
+        }
+
+        const messageId = await this._sendMessage(webhookUrl, embed);
+        this._log('success', `✅ Viatura publicada no Discord: ${viatura.nome}`);
+        return messageId;
+      }
+
+      return viatura.discordMessageId;
+    } catch (error) {
+      this._log('error', 'Erro ao sincronizar viatura:', error);
+      return null;
+    }
+  }
+
+  // ========== FARDAMENTOS ==========
+  // Cria o embed para fardamento (reutilizado na criação e edição)
+  _createFardamentoEmbed(fardamento) {
+    const url = `https://forca-tatica.vercel.app/fardamento`;
+
+    let pecasTexto = '';
+    if (fardamento.pecas && fardamento.pecas.length > 0) {
+      pecasTexto = fardamento.pecas
+        .slice(0, 5)
+        .map((p, i) => {
+          if (typeof p === 'string') {
+            return `${i + 1}. ${p.split('|')[0].trim()}`;
+          }
+          return `${i + 1}. ${p.tipo} ${p.numero || ''}`;
+        })
+        .join('\n');
+
+      if (fardamento.pecas.length > 5) {
+        pecasTexto += `\n... e mais ${fardamento.pecas.length - 5} peças`;
+      }
+    }
+
+    const embed = {
+      title: `👕 ${fardamento.discordMessageId ? 'FARDAMENTO ATUALIZADO' : 'NOVO FARDAMENTO'}: ${fardamento.nome}`,
+      description: fardamento.descricao || 'Fardamento operacional',
+      color: 0x9b59b6,
+      fields: [
+        {
+          name: '📦 PEÇAS',
+          value: `${fardamento.pecas?.length || 0} itens`,
+          inline: true,
         },
-      };
+        {
+          name: '🔗 ACESSO RÁPIDO',
+          value: `[🛡️ Ver todos os fardamentos](${url})`,
+          inline: false,
+        },
+      ],
+      timestamp: new Date().toISOString(),
+      footer: {
+        text: 'Força Tática PMESP',
+        icon_url: 'https://forca-tatica.vercel.app/favicon.ico',
+      },
+    };
 
-      if (viatura.fotoURL) {
-        embed.image = { url: viatura.fotoURL };
-        embed.thumbnail = { url: viatura.fotoURL };
-      }
-
-      const messageId = await this._sendMessage(webhookUrl, embed);
-      this._log('success', `✅ Viatura publicada no Discord: ${viatura.nome}`);
-      return messageId;
+    if (pecasTexto) {
+      embed.fields.push({
+        name: '📋 COMPOSIÇÃO',
+        value: pecasTexto,
+        inline: false,
+      });
     }
 
-    return viatura.discordMessageId;
-  } catch (error) {
-    this._log('error', 'Erro ao sincronizar viatura:', error);
-    return null;
-  }
-}
+    if (fardamento.fotoURL) {
+      embed.image = { url: fardamento.fotoURL };
+      embed.thumbnail = { url: fardamento.fotoURL };
+    }
 
-// ========== FARDAMENTOS ==========
-async syncFardamento(fardamento, action = 'upsert') {
-  const webhookUrl = this.webhooks.fardamentos;
-  if (!webhookUrl) {
-    this._log('error', '❌ Webhook fardamentos não configurado');
-    return null;
+    return embed;
   }
 
-  const isDelete = action === 'delete';
-  const url = `https://forca-tatica.vercel.app/fardamento`; // ✅ LINK NORMAL
+  async syncFardamento(fardamento, action = 'upsert') {
+    const webhookUrl = this.webhooks.fardamentos;
+    if (!webhookUrl) {
+      this._log('error', '❌ Webhook fardamentos não configurado');
+      return null;
+    }
 
-  try {
-    if (isDelete) {
+    const isDelete = action === 'delete';
+
+    try {
+      // 1. EXCLUSÃO
+      if (isDelete) {
+        if (fardamento.discordMessageId) {
+          await this._deleteMessage(webhookUrl, fardamento.discordMessageId);
+          this._log('success', `🗑️ Fardamento removido do Discord: ${fardamento.nome}`);
+        }
+        return true;
+      }
+
+      // 2. EDIÇÃO (já tem ID) → ATUALIZA a mensagem existente
       if (fardamento.discordMessageId) {
-        await this._deleteMessage(webhookUrl, fardamento.discordMessageId);
-        this._log('success', `🗑️ Fardamento removido do Discord: ${fardamento.nome}`);
-      }
-      return true;
-    }
-
-    // SÓ CRIAÇÃO - EDIÇÃO NÃO GERA MENSAGEM
-    if (!isDelete && !fardamento.discordMessageId) {
-      let pecasTexto = '';
-      if (fardamento.pecas && fardamento.pecas.length > 0) {
-        pecasTexto = fardamento.pecas
-          .slice(0, 5)
-          .map((p, i) => {
-            if (typeof p === 'string') {
-              return `${i + 1}. ${p.split('|')[0].trim()}`;
-            }
-            return `${i + 1}. ${p.tipo} ${p.numero || ''}`;
-          })
-          .join('\n');
-
-        if (fardamento.pecas.length > 5) {
-          pecasTexto += `\n... e mais ${fardamento.pecas.length - 5} peças`;
+        const embed = this._createFardamentoEmbed(fardamento);
+        const updated = await this._editMessage(webhookUrl, fardamento.discordMessageId, embed);
+        if (updated) {
+          this._log('success', `✏️ Fardamento atualizado no Discord: ${fardamento.nome}`);
+          return fardamento.discordMessageId;
+        } else {
+          // Se falhou a edição, tenta criar nova (fallback)
+          this._log('warning', `⚠️ Falha ao editar fardamento, criando nova mensagem...`);
         }
       }
 
-      const embed = {
-        title: `👕 NOVO FARDAMENTO: ${fardamento.nome}`,
-        description: fardamento.descricao || 'Fardamento operacional',
-        color: 0x9b59b6,
-        fields: [
-          {
-            name: '📦 PEÇAS',
-            value: `${fardamento.pecas?.length || 0} itens`,
-            inline: true,
-          },
-          {
-            name: '🔗 ACESSO RÁPIDO',
-            value: `[🛡️ Ver todos os fardamentos](${url})`, // ✅ LINK NORMAL
-            inline: false,
-          },
-        ],
-        timestamp: new Date().toISOString(),
-        footer: {
-          text: 'Força Tática PMESP',
-          icon_url: 'https://forca-tatica.vercel.app/favicon.ico',
+      // 3. CRIAÇÃO (não tem ID)
+      if (!fardamento.discordMessageId) {
+        const embed = this._createFardamentoEmbed(fardamento);
+        const messageId = await this._sendMessage(webhookUrl, embed);
+        this._log('success', `✅ Fardamento publicado no Discord: ${fardamento.nome}`);
+        return messageId;
+      }
+
+      return fardamento.discordMessageId;
+    } catch (error) {
+      this._log('error', 'Erro ao sincronizar fardamento:', error);
+      return null;
+    }
+  }
+
+  // ========== COMUNICADOS ==========
+  async syncComunicado(comunicado, action = 'upsert') {
+    const webhookUrl = this.webhooks.comunicados;
+    if (!webhookUrl) {
+      this._log('error', '❌ Webhook comunicados não configurado');
+      return null;
+    }
+
+    const isDelete = action === 'delete';
+    const isHide = action === 'hide';
+    const isShow = action === 'show';
+    const isUrgente = action === 'urgente';
+    const url = `https://forca-tatica.vercel.app`;
+
+    try {
+      // DELETE ou OCULTAR
+      if (isDelete || isHide) {
+        if (comunicado.discordMessageId) {
+          await this._deleteMessage(webhookUrl, comunicado.discordMessageId);
+          this._log('success', `🗑️ Comunicado removido do Discord: ${comunicado.titulo}`);
+        }
+        return true;
+      }
+
+      // ATUALIZAR URGÊNCIA (edição do embed)
+      if (isUrgente && comunicado.discordMessageId) {
+        const embed = this._createComunicadoEmbed(comunicado, 'upsert');
+        const updated = await this._editMessage(webhookUrl, comunicado.discordMessageId, embed);
+        if (updated) {
+          this._log('success', `⚠️ Urgência atualizada no Discord: ${comunicado.titulo}`);
+          return comunicado.discordMessageId;
+        } else {
+          this._log('warning', `⚠️ Falha ao atualizar urgência, tentando recriar...`);
+          // fallback: deleta e cria nova
+          await this._deleteMessage(webhookUrl, comunicado.discordMessageId);
+        }
+      }
+
+      // MOSTRAR (republicar)
+      if (isShow) {
+        if (comunicado.discordMessageId) {
+          await this._deleteMessage(webhookUrl, comunicado.discordMessageId);
+        }
+        const embed = this._createComunicadoEmbed(comunicado, 'show');
+        const messageId = await this._sendMessage(webhookUrl, embed);
+        this._log('success', `✅ Comunicado republicado no Discord: ${comunicado.titulo}`);
+        return messageId;
+      }
+
+      // CRIAÇÃO (não tem ID)
+      if (!comunicado.discordMessageId) {
+        const embed = this._createComunicadoEmbed(comunicado, 'upsert');
+        const messageId = await this._sendMessage(webhookUrl, embed);
+        this._log('success', `✅ Comunicado publicado no Discord: ${comunicado.titulo}`);
+        return messageId;
+      }
+
+      // EDIÇÃO NÃO-URGENTE? Por enquanto, não faz nada (pode ser implementado se necessário)
+      return comunicado.discordMessageId;
+    } catch (error) {
+      this._log('error', 'Erro ao sincronizar comunicado:', error);
+      return null;
+    }
+  }
+
+  // ========== EMBED DE COMUNICADO ==========
+  _createComunicadoEmbed(comunicado, action = 'upsert') {
+    const isShow = action === 'show';
+    const url = `https://forca-tatica.vercel.app`;
+
+    const cores = {
+      'INFORMATIVO': 0x3498db,
+      'INSTRUTIVO': 0xf1c40f,
+      'URGENTE': 0xe74c3c,
+      'ORDEM_DIA': 0x9b59b6,
+      'ESCALA': 0x2ecc71,
+    };
+
+    let titulo = `📢 ${comunicado.titulo}`;
+    if (comunicado.isUrgente) {
+      titulo = `⚠️⚠️ URGENTE: ${comunicado.titulo} ⚠️⚠️`;
+    }
+
+    const embed = {
+      title: titulo,
+      description: comunicado.conteudo?.substring(0, 2000) || 'Sem conteúdo',
+      color: cores[comunicado.tipo] || 0x3498db,
+      fields: [
+        {
+          name: '📌 TIPO',
+          value: comunicado.tipo || 'INFORMATIVO',
+          inline: true,
+        },
+        {
+          name: '📅 DATA',
+          value: comunicado.createdAt
+            ? new Date(comunicado.createdAt).toLocaleDateString('pt-BR', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              })
+            : new Date().toLocaleDateString('pt-BR'),
+          inline: true,
+        },
+        {
+          name: '🔗 ACESSO RÁPIDO',
+          value: `[📖 Ver todos os comunicados](${url})`,
+          inline: false,
+        },
+      ],
+      timestamp: new Date().toISOString(),
+      footer: {
+        text: isShow ? 'Comunicado reativado' : 'Força Tática PMESP',
+        icon_url: 'https://forca-tatica.vercel.app/favicon.ico',
+      },
+    };
+
+    if (comunicado.createdByName) {
+      embed.author = {
+        name: `Por: ${comunicado.createdByName.split('@')[0]}`,
+        icon_url: 'https://forca-tatica.vercel.app/logo-pm.png',
+      };
+    }
+
+    if (comunicado.fotoURL) {
+      embed.image = { url: comunicado.fotoURL };
+    }
+
+    return embed;
+  }
+
+  // ========== COMUNICAÇÃO COM DISCORD ==========
+  async _sendMessage(webhookUrl, embed) {
+    try {
+      const payload = {
+        content: `<@&1450612198576750766>`,
+        embeds: [embed],
+        username: 'Força Tática',
+        avatar_url: 'https://forca-tatica.vercel.app/logo.png',
+        allowed_mentions: {
+          roles: ['1450612198576750766'],
         },
       };
 
-      if (pecasTexto) {
-        embed.fields.push({
-          name: '📋 COMPOSIÇÃO',
-          value: pecasTexto,
-          inline: false,
-        });
+      const response = await fetch(`${webhookUrl}?wait=true`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
       }
 
-      if (fardamento.fotoURL) {
-        embed.image = { url: fardamento.fotoURL };
-        embed.thumbnail = { url: fardamento.fotoURL };
-      }
-
-      const messageId = await this._sendMessage(webhookUrl, embed);
-      this._log('success', `✅ Fardamento publicado no Discord: ${fardamento.nome}`);
-      return messageId;
+      const data = await response.json();
+      return data.id;
+    } catch (error) {
+      this._log('error', 'Falha ao enviar:', error.message);
+      return null;
     }
-
-    return fardamento.discordMessageId;
-  } catch (error) {
-    this._log('error', 'Erro ao sincronizar fardamento:', error);
-    return null;
-  }
-}
-
-// ========== COMUNICADOS ==========
-async syncComunicado(comunicado, action = 'upsert') {
-  const webhookUrl = this.webhooks.comunicados;
-  if (!webhookUrl) {
-    this._log('error', '❌ Webhook comunicados não configurado');
-    return null;
   }
 
-  const isDelete = action === 'delete';
-  const isHide = action === 'hide';
-  const isShow = action === 'show';
-  const isUrgente = action === 'urgente';
-  const url = `https://forca-tatica.vercel.app`; // ✅ LINK NORMAL
+  async _editMessage(webhookUrl, messageId, embed) {
+    try {
+      const response = await fetch(`${webhookUrl}/messages/${messageId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          embeds: [embed],
+        }),
+      });
 
-  try {
-    // DELETE ou OCULTAR
-    if (isDelete || isHide) {
-      if (comunicado.discordMessageId) {
-        await this._deleteMessage(webhookUrl, comunicado.discordMessageId);
-        this._log('success', `🗑️ Comunicado removido do Discord: ${comunicado.titulo}`);
-      }
+      return response.ok;
+    } catch (error) {
+      this._log('error', 'Falha ao editar:', error.message);
+      return false;
+    }
+  }
+
+  async _deleteMessage(webhookUrl, messageId) {
+    try {
+      const response = await fetch(`${webhookUrl}/messages/${messageId}`, {
+        method: 'DELETE',
+      });
+      return response.ok;
+    } catch (error) {
+      this._log('error', 'Falha ao deletar:', error.message);
+      return false;
+    }
+  }
+
+  // ========== GERENCIAMENTO HIERARQUIA ==========
+  async _getMensagemHierarquia() {
+    try {
+      const docRef = doc(db, 'config', 'discord_hierarquia');
+      const docSnap = await getDoc(docRef);
+      return docSnap.exists() ? docSnap.data().messageId : null;
+    } catch (error) {
+      this._log('error', 'Erro ao buscar mensagem da hierarquia:', error);
+      return null;
+    }
+  }
+
+  async _salvarMensagemHierarquia(messageId) {
+    try {
+      const docRef = doc(db, 'config', 'discord_hierarquia');
+      await setDoc(
+        docRef,
+        {
+          messageId,
+          updatedAt: new Date(),
+        },
+        { merge: true }
+      );
       return true;
+    } catch (error) {
+      this._log('error', 'Erro ao salvar mensagem da hierarquia:', error);
+      return false;
     }
-
-    // ATUALIZAR URGÊNCIA
-    if (isUrgente && comunicado.discordMessageId) {
-      const embed = this._createComunicadoEmbed(comunicado, 'upsert');
-      await this._editMessage(webhookUrl, comunicado.discordMessageId, embed);
-      this._log('success', `⚠️ Urgência atualizada: ${comunicado.titulo}`);
-      return comunicado.discordMessageId;
-    }
-
-    // MOSTRAR (republicar)
-    if (isShow) {
-      if (comunicado.discordMessageId) {
-        await this._deleteMessage(webhookUrl, comunicado.discordMessageId);
-      }
-      const embed = this._createComunicadoEmbed(comunicado, 'show');
-      const messageId = await this._sendMessage(webhookUrl, embed);
-      this._log('success', `✅ Comunicado republicado no Discord: ${comunicado.titulo}`);
-      return messageId;
-    }
-
-    // CRIAÇÃO
-    if (!isDelete && !comunicado.discordMessageId) {
-      const embed = this._createComunicadoEmbed(comunicado, 'upsert');
-      const messageId = await this._sendMessage(webhookUrl, embed);
-      this._log('success', `✅ Comunicado publicado no Discord: ${comunicado.titulo}`);
-      return messageId;
-    }
-
-    return comunicado.discordMessageId;
-  } catch (error) {
-    this._log('error', 'Erro ao sincronizar comunicado:', error);
-    return null;
-  }
-}
-
-// ========== EMBED DE COMUNICADO ==========
-_createComunicadoEmbed(comunicado, action = 'upsert') {
-  const isShow = action === 'show';
-  const url = `https://forca-tatica.vercel.app`; // ✅ LINK NORMAL
-  
-  // CORES POR TIPO
-  const cores = {
-    'INFORMATIVO': 0x3498db,
-    'INSTRUTIVO': 0xf1c40f,
-    'URGENTE': 0xe74c3c,
-    'ORDEM_DIA': 0x9b59b6,
-    'ESCALA': 0x2ecc71,
-  };
-
-  // TÍTULO COM URGÊNCIA
-  let titulo = `📢 ${comunicado.titulo}`;
-  if (comunicado.isUrgente) {
-    titulo = `⚠️⚠️ URGENTE: ${comunicado.titulo} `;
   }
 
-  const embed = {
-    title: titulo,
-    description: comunicado.conteudo?.substring(0, 2000) || 'Sem conteúdo',
-    color: cores[comunicado.tipo] || 0x3498db,
-    fields: [
-      {
-        name: '📌 TIPO',
-        value: comunicado.tipo || 'INFORMATIVO',
-        inline: true,
-      },
-      {
-        name: '📅 DATA',
-        value: comunicado.createdAt
-          ? new Date(comunicado.createdAt).toLocaleDateString('pt-BR', {
-              day: '2-digit',
-              month: '2-digit',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-            })
-          : new Date().toLocaleDateString('pt-BR'),
-        inline: true,
-      },
-      {
-        name: '🔗 ACESSO RÁPIDO',
-        value: `[📖 Ver todos os comunicados](${url})`, // ✅ LINK NORMAL
-        inline: false,
-      },
-    ],
-    timestamp: new Date().toISOString(),
-    footer: {
-      text: isShow ? 'Comunicado reativado' : 'Força Tática PMESP',
-      icon_url: 'https://forca-tatica.vercel.app/favicon.ico',
-    },
-  };
-
-  // ADICIONAR AUTOR
-  if (comunicado.createdByName) {
-    embed.author = {
-      name: `Por: ${comunicado.createdByName.split('@')[0]}`,
-      icon_url: 'https://forca-tatica.vercel.app/logo-pm.png',
-    };
-  }
-
-  // ADICIONAR IMAGEM SE HOUVER
-  if (comunicado.fotoURL) {
-    embed.image = { url: comunicado.fotoURL };
-  }
-
-  return embed;
-}
-
-// ========== COMUNICAÇÃO COM DISCORD ==========
-async _sendMessage(webhookUrl, embed) {
-  try {
-    const payload = {
-      content: `<@&1450612198576750766>`, // ✅ @MENÇÃO FIXA PARA TODOS!
-      embeds: [embed],
-      username: 'Força Tática',
-      avatar_url: 'https://forca-tatica.vercel.app/logo.png',
-      allowed_mentions: {
-        roles: ['1450612198576750766'] // ✅ PERMITE A MENÇÃO
-      }
-    };
-
-    const response = await fetch(`${webhookUrl}?wait=true`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data.id;
-  } catch (error) {
-    this._log('error', 'Falha ao enviar:', error.message);
-    return null;
-  }
-}
-
-async _editMessage(webhookUrl, messageId, embed) {
-  try {
-    const response = await fetch(`${webhookUrl}/messages/${messageId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        embeds: [embed],
-      }),
-    });
-
-    return response.ok;
-  } catch (error) {
-    this._log('error', 'Falha ao editar:', error.message);
-    return false;
-  }
-}
-
-async _deleteMessage(webhookUrl, messageId) {
-  try {
-    const response = await fetch(`${webhookUrl}/messages/${messageId}`, {
-      method: 'DELETE',
-    });
-    return response.ok;
-  } catch (error) {
-    this._log('error', 'Falha ao deletar:', error.message);
-    return false;
-  }
-}
-
-// ========== GERENCIAMENTO HIERARQUIA ==========
-async _getMensagemHierarquia() {
-  try {
-    const docRef = doc(db, 'config', 'discord_hierarquia');
-    const docSnap = await getDoc(docRef);
-    return docSnap.exists() ? docSnap.data().messageId : null;
-  } catch (error) {
-    this._log('error', 'Erro ao buscar mensagem da hierarquia:', error);
-    return null;
-  }
-}
-
-async _salvarMensagemHierarquia(messageId) {
-  try {
-    const docRef = doc(db, 'config', 'discord_hierarquia');
-    await setDoc(
-      docRef,
-      {
-        messageId,
-        updatedAt: new Date(),
-      },
-      { merge: true }
-    );
-    return true;
-  } catch (error) {
-    this._log('error', 'Erro ao salvar mensagem da hierarquia:', error);
-    return false;
-  }
-}
   // ========== UTILITÁRIOS ==========
   _log(type, message, ...args) {
     const colors = {
@@ -581,9 +607,8 @@ export const upsertDiscordMessage = (collection, itemId, itemData, action = 'ups
   }[collection];
 
   if (!method) return null;
-  return discordManager[method]({ ...itemData, id: itemId }, action);  // 👈 PASSA ACTION
+  return discordManager[method]({ ...itemData, id: itemId }, action);
 };
-
 
 export const deleteDiscordMessage = (collection, itemData) => {
   const method = {
@@ -597,7 +622,6 @@ export const deleteDiscordMessage = (collection, itemData) => {
   return discordManager[method](itemData, 'delete');
 };
 
-// NOVAS EXPORTAÇÕES PARA COMUNICADOS
 export const hideDiscordMessage = (collection, itemData) => {
   if (collection !== 'comunicados') return null;
   return discordManager.syncComunicado(itemData, 'hide');
