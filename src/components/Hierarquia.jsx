@@ -28,6 +28,7 @@ import {
   EyeOff,
 } from 'lucide-react';
 import { getAdvertenciaColor } from './utils/fardaColors';
+import { sendDiscordNotification } from '../utils/discordWebhooks';
 
 const Hierarquia = ({ isAdmin }) => {
   const [membros, setMembros] = useState([]);
@@ -81,36 +82,36 @@ const Hierarquia = ({ isAdmin }) => {
   }, []);
 
   // ESC para fechar modais (membro e advertência)
-useEffect(() => {
-  const handleEsc = (e) => {
-    if (e.key === 'Escape') {
-      if (isModalOpen) {
-        setModalOpen(false);
-        setEditingMembro(null);
-        setFormData({
-          nome: '',
-          patente: 'Tenente Coronel',
-          fotoURL: '',
-          ativo: true,
-          observacoes: '',
-        });
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') {
+        if (isModalOpen) {
+          setModalOpen(false);
+          setEditingMembro(null);
+          setFormData({
+            nome: '',
+            patente: 'Tenente Coronel',
+            fotoURL: '',
+            ativo: true,
+            observacoes: '',
+          });
+        }
+        if (isAdvertenciaModalOpen) {
+          setAdvertenciaModalOpen(false);
+          setAdvertenciaForm({
+            tipo: 'ausencia',
+            motivo: '',
+            dataInicio: new Date().toISOString().split('T')[0],
+            dataFim: '',
+            descricao: '',
+          });
+        }
       }
-      if (isAdvertenciaModalOpen) {
-        setAdvertenciaModalOpen(false);
-        setAdvertenciaForm({
-          tipo: 'ausencia',
-          motivo: '',
-          dataInicio: new Date().toISOString().split('T')[0],
-          dataFim: '',
-          descricao: '',
-        });
-      }
-    }
-  };
+    };
 
-  window.addEventListener('keydown', handleEsc);
-  return () => window.removeEventListener('keydown', handleEsc);
-}, [isModalOpen, isAdvertenciaModalOpen]);
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [isModalOpen, isAdvertenciaModalOpen]);
 
   const handleSaveMembro = async () => {
     if (!formData.nome || !formData.patente) {
@@ -131,6 +132,11 @@ useEffect(() => {
       } else {
         await addDoc(collection(db, 'hierarquia'), membroData);
       }
+      // Envia notificação para Discord APENAS se for um novo membro (não edição)
+      if (!editingMembro) {
+        await sendDiscordNotification('hierarquia', membroData);
+      }
+
       setModalOpen(false);
       setEditingMembro(null);
       setFormData({
