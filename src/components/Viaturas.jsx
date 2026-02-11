@@ -8,14 +8,14 @@ import {
   onSnapshot,
   query,
   orderBy,
-  getDoc, // 👈 IMPORTANTE: Adicionar getDoc
+  getDoc,
 } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
 import { Car, Plus, Edit, Trash2, Save, X } from 'lucide-react';
 import {
   upsertDiscordMessage,
   deleteDiscordMessage,
-} from '../utils/discordManager'; // 👈 Substituir discordWebhooks
+} from '../utils/discordManager';
 
 export const Viaturas = ({ isAdmin }) => {
   const [viaturas, setViaturas] = useState([]);
@@ -56,7 +56,6 @@ export const Viaturas = ({ isAdmin }) => {
     return () => window.removeEventListener('keydown', handleEsc);
   }, [isModalOpen]);
 
-  // ========== HANDLE SAVE - ATUALIZADO ==========
   const handleSave = async () => {
     if (!formData.nome || !formData.modelo) {
       alert('Preencha pelo menos nome e modelo!');
@@ -74,27 +73,21 @@ export const Viaturas = ({ isAdmin }) => {
       let discordMessageId = null;
 
       if (editingViatura) {
-        // === EDIÇÃO: Atualizar viatura existente ===
         await updateDoc(doc(db, 'viaturas', editingViatura.id), viaturaData);
         
-        // 🔄 Sincronizar com Discord (ATUALIZA a mensagem existente)
         discordMessageId = await upsertDiscordMessage('viaturas', editingViatura.id, {
           ...viaturaData,
           id: editingViatura.id,
-          discordMessageId: editingViatura.discordMessageId // Mantém o ID existente
+          discordMessageId: editingViatura.discordMessageId,
         });
-        
       } else {
-        // === CRIAÇÃO: Nova viatura ===
         const docRef = await addDoc(collection(db, 'viaturas'), viaturaData);
         
-        // 🔄 Sincronizar com Discord (CRIA nova mensagem)
         discordMessageId = await upsertDiscordMessage('viaturas', docRef.id, {
           ...viaturaData,
           id: docRef.id
         });
         
-        // 💾 SALVAR o ID da mensagem no Firebase!
         if (discordMessageId) {
           await updateDoc(doc(db, 'viaturas', docRef.id), {
             discordMessageId: discordMessageId
@@ -102,7 +95,6 @@ export const Viaturas = ({ isAdmin }) => {
         }
       }
 
-      // ✅ Limpar estado e fechar modal
       setModalOpen(false);
       setEditingViatura(null);
       setFormData({
@@ -113,16 +105,13 @@ export const Viaturas = ({ isAdmin }) => {
         fotoURL: '',
       });
 
-      // 📋 Log de sucesso
       console.log(`✅ Viatura ${editingViatura ? 'atualizada' : 'criada'}: ${viaturaData.nome}`);
-      
     } catch (error) {
       console.error('Erro ao salvar viatura:', error);
       alert('Erro ao salvar viatura. Tente novamente.');
     }
   };
 
-  // ========== HANDLE EDIT ==========
   const handleEdit = (viatura) => {
     setEditingViatura(viatura);
     setFormData({
@@ -135,11 +124,9 @@ export const Viaturas = ({ isAdmin }) => {
     setModalOpen(true);
   };
 
-  // ========== HANDLE DELETE - ATUALIZADO ==========
   const handleDelete = async (id) => {
     if (window.confirm('Tem certeza que deseja excluir esta viatura?')) {
       try {
-        // 🔍 Buscar dados da viatura ANTES de deletar
         const viaturaDoc = await getDoc(doc(db, 'viaturas', id));
         const viaturaData = viaturaDoc.data();
 
@@ -147,7 +134,6 @@ export const Viaturas = ({ isAdmin }) => {
           throw new Error('Viatura não encontrada');
         }
 
-        // 🔄 Remover do Discord PRIMEIRO
         if (viaturaData?.discordMessageId) {
           await deleteDiscordMessage('viaturas', {
             ...viaturaData,
@@ -156,10 +142,8 @@ export const Viaturas = ({ isAdmin }) => {
           });
         }
 
-        // 🗑️ Depois deletar do Firebase
         await deleteDoc(doc(db, 'viaturas', id));
 
-        // 🎯 Atualizar estado local
         setViaturas(prev => prev.filter(v => v.id !== id));
 
         console.log(`🗑️ Viatura removida: ${viaturaData?.nome}`);
@@ -170,7 +154,6 @@ export const Viaturas = ({ isAdmin }) => {
     }
   };
 
-  // ========== RENDER MODAL ==========
   const renderModal = () => {
     if (!isModalOpen) return null;
 
@@ -209,14 +192,13 @@ export const Viaturas = ({ isAdmin }) => {
                   className="w-full bg-gray-900 border border-blue-500/20 rounded-lg p-3 text-white outline-none focus:border-blue-500"
                 />
                 {field === 'fotoURL' && formData.fotoURL && (
-                  <div className="mt-2 w-16 h-16 rounded-lg overflow-hidden border border-blue-500/20">
+                  <div className="mt-2 w-24 h-24 rounded-lg overflow-hidden border-2 border-blue-500/30">
                     <img
                       src={formData.fotoURL}
                       alt="Preview"
-                      className="w-full h-full object-cover image-preview"
+                      className="w-full h-full object-contain image-preview"
                       onError={(e) => {
-                        e.target.src =
-                          'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIGZpbGw9IiMxRjJBM0MiLz48cGF0aCBkPSJNNDAgMzJMMzIgNDBMMjQgMzJMMzIgMjRMNDAgMzJaIiBmaWxsPSIjM0I4MkVGIi8+PC9zdmc+';
+                        e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iOTYiIGhlaWdodD0iOTYiIHZpZXdCb3g9IjAgMCA5NiA5NiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iOTYiIGhlaWdodD0iOTYiIGZpbGw9IiMxRjJBM0MiLz48cGF0aCBkPSJNNDggNDhMMzIgNjRMMTYgNDhMMzIgMzJMNDggNDhaIiBmaWxsPSIjM0I4MkVGIi8+PC9zdmc+';
                       }}
                     />
                   </div>
@@ -289,7 +271,7 @@ export const Viaturas = ({ isAdmin }) => {
             key={vtr.id}
             className="bg-gray-800/50 border border-blue-500/20 rounded-xl overflow-hidden hover:border-blue-500/40 transition group fade-in"
           >
-            <div className="h-50 overflow-hidden bg-gray-900">
+            <div className="h-48 overflow-hidden bg-gray-900">
               {vtr.fotoURL ? (
                 <img
                   src={vtr.fotoURL}
@@ -317,12 +299,20 @@ export const Viaturas = ({ isAdmin }) => {
                     </p>
                   )}
                   
-                  {/* ID do Discord (debug) - Remover depois */}
-                  {vtr.discordMessageId && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      🟢 Discord ID: {vtr.discordMessageId.substring(0, 8)}...
-                    </p>
-                  )}
+                  {/* Link direto para a viatura */}
+                  <a
+                    href={`https://forca-tatica.vercel.app/viaturas?id=${vtr.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-blue-400 hover:text-blue-300 mt-2 inline-flex items-center gap-1 transition"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                      <polyline points="15 3 21 3 21 9" />
+                      <line x1="10" y1="14" x2="21" y2="3" />
+                    </svg>
+                    Ver ficha completa
+                  </a>
                 </div>
               </div>
 
