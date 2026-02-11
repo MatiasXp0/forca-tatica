@@ -19,10 +19,16 @@ import Fardamentos from './components/Fardamentos';
 import Viaturas from './components/Viaturas';
 import Hierarquia from './components/Hierarquia';
 
+// 🔴 COMPONENTE DE MIGRAÇÃO - REMOVA DEPOIS DE USAR
+import DiscordMigracao from './components/DiscordMigracao';
+
 const App = () => {
   const [user, setUser] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
+  
+  // 🔴 STATE PARA CONTROLAR O MODAL DE MIGRAÇÃO
+  const [showMigracao, setShowMigracao] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -77,6 +83,25 @@ const App = () => {
 
   return (
     <Router>
+      {/* 🔴 BOTÃO FLUTUANTE DE MIGRAÇÃO (SÓ APARECE PARA ADMINS) */}
+      {user && isAdmin && (
+        <div className="fixed bottom-6 right-6 z-[9999]">
+          <button
+            onClick={() => setShowMigracao(true)}
+            className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-6 py-3 rounded-full font-semibold flex items-center gap-2 shadow-2xl shadow-purple-500/30 transition-all hover:scale-110"
+            title="Migrar dados para Discord"
+          >
+            <span className="text-xl">🔄</span>
+            <span className="hidden md:inline">Migrar Discord</span>
+          </button>
+        </div>
+      )}
+
+      {/* 🔴 MODAL DE MIGRAÇÃO */}
+      {showMigracao && (
+        <DiscordMigracao onClose={() => setShowMigracao(false)} />
+      )}
+
       <Routes>
         <Route
           path="/login"
