@@ -10,6 +10,7 @@ import { auth, db } from './firebaseConfig';
 import { getDoc, doc, setDoc } from 'firebase/firestore';
 
 import './styles/fardamentos.css';
+import ComunicadoDetalhe from './pages/ComunicadoDetalhe';
 
 // Componentes
 import { Layout } from './components/Layout';
@@ -82,82 +83,85 @@ const App = () => {
   }
 
   return (
-    <Router>
-      {/* 🔴 BOTÃO FLUTUANTE DE MIGRAÇÃO (SÓ APARECE PARA ADMINS) */}
-      {user && isAdmin && (
-        <div className="fixed bottom-6 right-6 z-[9999]">
-          <button
-            onClick={() => setShowMigracao(true)}
-            className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-6 py-3 rounded-full font-semibold flex items-center gap-2 shadow-2xl shadow-purple-500/30 transition-all hover:scale-110"
-            title="Migrar dados para Discord"
-          >
-            <span className="text-xl">🔄</span>
-            <span className="hidden md:inline">Migrar Discord</span>
-          </button>
-        </div>
-      )}
+  <Router>
+    {/* 🔴 BOTÃO FLUTUANTE DE MIGRAÇÃO (SÓ APARECE PARA ADMINS) */}
+    {user && isAdmin && (
+      <div className="fixed bottom-6 right-6 z-[9999]">
+        <button
+          onClick={() => setShowMigracao(true)}
+          className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-6 py-3 rounded-full font-semibold flex items-center gap-2 shadow-2xl shadow-purple-500/30 transition-all hover:scale-110"
+          title="Migrar dados para Discord"
+        >
+          <span className="text-xl">🔄</span>
+          <span className="hidden md:inline">Migrar Discord</span>
+        </button>
+      </div>
+    )}
 
-      {/* 🔴 MODAL DE MIGRAÇÃO */}
-      {showMigracao && (
-        <DiscordMigracao onClose={() => setShowMigracao(false)} />
-      )}
+    {/* 🔴 MODAL DE MIGRAÇÃO */}
+    {showMigracao && (
+      <DiscordMigracao onClose={() => setShowMigracao(false)} />
+    )}
 
-      <Routes>
-        <Route
-          path="/login"
-          element={!user ? <Login /> : <Navigate to="/" />}
-        />
-        <Route
-          path="/"
-          element={
-            user ? (
-              <Layout user={user} isAdmin={isAdmin}>
-                <Comunicados isAdmin={isAdmin} />
-              </Layout>
-            ) : (
-              <Navigate to="/login" />
-            )
-          }
-        />
-        <Route
-          path="/viaturas"
-          element={
-            user ? (
-              <Layout user={user} isAdmin={isAdmin}>
-                <Viaturas isAdmin={isAdmin} />
-              </Layout>
-            ) : (
-              <Navigate to="/login" />
-            )
-          }
-        />
-        <Route
-          path="/fardamento"
-          element={
-            user ? (
-              <Layout user={user} isAdmin={isAdmin}>
-                <Fardamentos isAdmin={isAdmin} />
-              </Layout>
-            ) : (
-              <Navigate to="/login" />
-            )
-          }
-        />
-        <Route
-          path="/hierarquia"
-          element={
-            user ? (
-              <Layout user={user} isAdmin={isAdmin}>
-                <Hierarquia isAdmin={isAdmin} />
-              </Layout>
-            ) : (
-              <Navigate to="/login" />
-            )
-          }
-        />
-      </Routes>
-    </Router>
-  );
+    <Routes>
+      {/* ✅ ROTA DO COMUNICADO DETALHE - PRIMEIRA */}
+      <Route path="/comunicados/:id" element={<ComunicadoDetalhe />} />
+      
+      <Route
+        path="/login"
+        element={!user ? <Login /> : <Navigate to="/" />}
+      />
+      <Route
+        path="/"
+        element={
+          user ? (
+            <Layout user={user} isAdmin={isAdmin}>
+              <Comunicados isAdmin={isAdmin} />
+            </Layout>
+          ) : (
+            <Navigate to="/login" />
+          )
+        }
+      />
+      <Route
+        path="/viaturas"
+        element={
+          user ? (
+            <Layout user={user} isAdmin={isAdmin}>
+              <Viaturas isAdmin={isAdmin} />
+            </Layout>
+          ) : (
+            <Navigate to="/login" />
+          )
+        }
+      />
+      <Route
+        path="/fardamento"
+        element={
+          user ? (
+            <Layout user={user} isAdmin={isAdmin}>
+              <Fardamentos isAdmin={isAdmin} />
+            </Layout>
+          ) : (
+            <Navigate to="/login" />
+          )
+        }
+      />
+      <Route
+        path="/hierarquia"
+        element={
+          user ? (
+            <Layout user={user} isAdmin={isAdmin}>
+              <Hierarquia isAdmin={isAdmin} />
+            </Layout>
+          ) : (
+            <Navigate to="/login" />
+          )
+        }
+      />
+    </Routes>
+  </Router>
+);
 };
 
 export default App;
