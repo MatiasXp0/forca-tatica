@@ -13,6 +13,7 @@ import { auth, db } from '../firebaseConfig';
 import { Shirt, Plus, Edit, Trash2, ChevronRight, Save, X } from 'lucide-react';
 import { getFardaColor } from './utils/fardaColors';
 import '../styles/fardamentos.css';
+import { sendDiscordNotification } from '../utils/discordWebhooks';
 
 // Componente para exibir a foto
 const FardaImage = ({ farda, size = 'medium' }) => {
@@ -60,8 +61,8 @@ const FardaImage = ({ farda, size = 'medium' }) => {
                 <div style="text-align:center">
                   <Shirt size="${iconSize}" style="color:rgba(255,255,255,0.6)" />
                   <div style="color:rgba(255,255,255,0.5);font-size:12px;margin-top:6px;font-weight:600">${
-                farda.nome.split(' ')[0]
-              }</div>
+                    farda.nome.split(' ')[0]
+                  }</div>
                 </div>
               </div>
             `;
@@ -98,8 +99,6 @@ const FardaImage = ({ farda, size = 'medium' }) => {
     </div>
   );
 };
-;
-
 const Fardamentos = ({ isAdmin }) => {
   const [fardamentos, setFardamentos] = useState([]);
   const [selectedFarda, setSelectedFarda] = useState(null);
@@ -122,24 +121,24 @@ const Fardamentos = ({ isAdmin }) => {
       setFardamentos(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
   }, []);
-  
-  useEffect(() => {
-  const handleEsc = (e) => {
-    if (e.key === 'Escape' && isModalOpen) {
-      setModalOpen(false);
-      setEditingFarda(null);
-      setFormData({
-        nome: '',
-        descricao: '',
-        fotoURL: '',
-        pecas: [{ tipo: '', numero: '', textura: '', descricao: '' }],
-      });
-    }
-  };
 
-  window.addEventListener('keydown', handleEsc);
-  return () => window.removeEventListener('keydown', handleEsc);
-}, [isModalOpen]);
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === 'Escape' && isModalOpen) {
+        setModalOpen(false);
+        setEditingFarda(null);
+        setFormData({
+          nome: '',
+          descricao: '',
+          fotoURL: '',
+          pecas: [{ tipo: '', numero: '', textura: '', descricao: '' }],
+        });
+      }
+    };
+
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [isModalOpen]);
 
   const handleSaveFarda = async () => {
     if (!formData.nome) {
@@ -176,6 +175,11 @@ const Fardamentos = ({ isAdmin }) => {
       } else {
         await addDoc(collection(db, 'fardamentos'), fardaData);
       }
+      // Envia notificação para Discord APENAS se for um novo fardamento (não edição)
+      if (!editingFarda) {
+        await sendDiscordNotification('fardamentos', fardaData);
+      }
+
       setModalOpen(false);
       setEditingFarda(null);
       setFormData({
