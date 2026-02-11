@@ -326,10 +326,11 @@ class DiscordManager {
   const isDelete = action === 'delete';
   const isHide = action === 'hide';
   const isShow = action === 'show';
-  const url = `https://forca-tatica.vercel.app/comunicados/${comunicado.id}`;
+  const isUrgente = action === 'urgente';  // ✅ NOVO
+  const url = `https://forca-tatica.vercel.app/comunicados?id=${comunicado.id}`;
 
   try {
-    // DELETE ou OCULTAR = REMOVER MENSAGEM
+    // DELETE ou OCULTAR
     if (isDelete || isHide) {
       if (comunicado.discordMessageId) {
         await this._deleteMessage(webhookUrl, comunicado.discordMessageId);
@@ -338,31 +339,33 @@ class DiscordManager {
       return true;
     }
 
+    // ✅ ATUALIZAR URGÊNCIA
+    if (isUrgente && comunicado.discordMessageId) {
+      const embed = this._createComunicadoEmbed(comunicado, 'upsert');
+      await this._editMessage(webhookUrl, comunicado.discordMessageId, embed);
+      this._log('success', `⚠️ Urgência atualizada: ${comunicado.titulo}`);
+      return comunicado.discordMessageId;
+    }
+
     // MOSTRAR (republicar)
     if (isShow) {
       if (comunicado.discordMessageId) {
         await this._deleteMessage(webhookUrl, comunicado.discordMessageId);
       }
       const embed = this._createComunicadoEmbed(comunicado, 'show');
-      
-      // ✅ ADICIONAR @MENÇÃO AQUI!
       const messageId = await this._sendMessage(webhookUrl, embed, {
-        content: `<@&1450612198576750766>` // 👈 MENÇÃO DO CARGO
+        content: `<@&1450612198576750766>`
       });
-      
       this._log('success', `✅ Comunicado republicado no Discord: ${comunicado.titulo}`);
       return messageId;
     }
 
-    // CRIAÇÃO - SÓ SE NÃO TEM ID
+    // CRIAÇÃO
     if (!isDelete && !comunicado.discordMessageId) {
       const embed = this._createComunicadoEmbed(comunicado, 'upsert');
-      
-      // ✅ ADICIONAR @MENÇÃO AQUI!
       const messageId = await this._sendMessage(webhookUrl, embed, {
-        content: `<@&1450612198576750766>` // 👈 MENÇÃO DO CARGO
+        content: `<@&1450612198576750766>`
       });
-      
       this._log('success', `✅ Comunicado publicado no Discord: ${comunicado.titulo}`);
       return messageId;
     }
@@ -577,7 +580,7 @@ class DiscordManager {
 const discordManager = new DiscordManager();
 
 // ========== EXPORTAÇÕES ==========
-export const upsertDiscordMessage = (collection, itemId, itemData) => {
+export const upsertDiscordMessage = (collection, itemId, itemData, action = 'upsert') => {
   const method = {
     hierarquia: 'syncHierarquia',
     viaturas: 'syncViatura',
@@ -586,8 +589,9 @@ export const upsertDiscordMessage = (collection, itemId, itemData) => {
   }[collection];
 
   if (!method) return null;
-  return discordManager[method]({ ...itemData, id: itemId }, 'upsert');
+  return discordManager[method]({ ...itemData, id: itemId }, action);  // 👈 PASSA ACTION
 };
+
 
 export const deleteDiscordMessage = (collection, itemData) => {
   const method = {
