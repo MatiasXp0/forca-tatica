@@ -31,7 +31,9 @@ import { getAdvertenciaColor } from './utils/fardaColors';
 import {
   upsertDiscordMessage,
   deleteDiscordMessage,
-} from '../utils/discordManager'; // 👈 IMPORTANTE: Mudar para discordManager
+  syncHierarquiaLista
+} from '../utils/discordManager';
+import { iniciarSyncHierarquia, pararSyncHierarquia } from '../utils/syncHierarquia';
 
 const Hierarquia = ({ isAdmin }) => {
   const [membros, setMembros] = useState([]);
@@ -62,7 +64,7 @@ const Hierarquia = ({ isAdmin }) => {
     'Capitão',
     '1° Tenente',
     '2° Tenente',
-    'Aspirante a Oficial ',
+    'Aspirante a Oficial',
     'Sub Tenente',
     '1° Sargento',
     '2° Sargento',
@@ -71,6 +73,12 @@ const Hierarquia = ({ isAdmin }) => {
     'Soldado 1° Classe',
     'Soldado 2° Classe',
   ];
+
+  // Iniciar sincronização automática da hierarquia
+  useEffect(() => {
+    iniciarSyncHierarquia();
+    return () => pararSyncHierarquia();
+  }, []);
 
   useEffect(() => {
     const q = query(collection(db, 'hierarquia'), orderBy('patente'));
@@ -84,7 +92,7 @@ const Hierarquia = ({ isAdmin }) => {
     });
   }, []);
 
-  // ESC para fechar modais (membro e advertência)
+  // ESC para fechar modais
   useEffect(() => {
     const handleEsc = (e) => {
       if (e.key === 'Escape') {
@@ -116,7 +124,6 @@ const Hierarquia = ({ isAdmin }) => {
     return () => window.removeEventListener('keydown', handleEsc);
   }, [isModalOpen, isAdvertenciaModalOpen]);
 
-  // ========== HANDLE SAVE MEMBRO - ATUALIZADO ==========
   const handleSaveMembro = async () => {
     if (!formData.nome || !formData.patente) {
       alert('Preencha nome e patente!');
@@ -135,10 +142,8 @@ const Hierarquia = ({ isAdmin }) => {
       let discordMessageId = null;
 
       if (editingMembro) {
-        // === EDIÇÃO: Atualizar membro existente ===
         await updateDoc(doc(db, 'hierarquia', editingMembro.id), membroData);
 
-        // 🔄 Sincronizar com Discord (ATUALIZA a mensagem existente)
         discordMessageId = await upsertDiscordMessage(
           'hierarquia',
           editingMembro.id,
@@ -149,16 +154,13 @@ const Hierarquia = ({ isAdmin }) => {
           }
         );
       } else {
-        // === CRIAÇÃO: Novo membro ===
         const result = await addDoc(collection(db, 'hierarquia'), membroData);
 
-        // 🔄 Sincronizar com Discord (CRIA nova mensagem)
         discordMessageId = await upsertDiscordMessage('hierarquia', result.id, {
           ...membroData,
           id: result.id,
         });
 
-        // 💾 SALVAR o ID da mensagem no Firebase!
         if (discordMessageId) {
           await updateDoc(doc(db, 'hierarquia', result.id), {
             discordMessageId: discordMessageId,
@@ -166,7 +168,6 @@ const Hierarquia = ({ isAdmin }) => {
         }
       }
 
-      // ✅ Limpar estado e fechar modal
       setModalOpen(false);
       setEditingMembro(null);
       setFormData({
@@ -177,21 +178,16 @@ const Hierarquia = ({ isAdmin }) => {
         observacoes: '',
       });
 
-      // 📋 Log de sucesso
-      console.log(
-        `✅ Membro ${editingMembro ? 'atualizado' : 'adicionado'}: ${membroData.nome}`
-      );
+      console.log(`✅ Membro ${editingMembro ? 'atualizado' : 'adicionado'}: ${membroData.nome}`);
     } catch (error) {
       console.error('Erro ao salvar membro:', error);
       alert('Erro ao salvar membro. Tente novamente.');
     }
   };
 
-  // ========== HANDLE DELETE MEMBRO - ATUALIZADO ==========
   const handleDeleteMembro = async (id) => {
     if (window.confirm('Tem certeza que deseja excluir este membro?')) {
       try {
-        // Buscar dados antes de deletar
         const membroDoc = await getDoc(doc(db, 'hierarquia', id));
         const membroData = membroDoc.data();
 
@@ -199,7 +195,6 @@ const Hierarquia = ({ isAdmin }) => {
           throw new Error('Membro não encontrado');
         }
 
-        // 🔄 Remover do Discord PRIMEIRO
         if (membroData?.discordMessageId) {
           await deleteDiscordMessage('hierarquia', {
             ...membroData,
@@ -208,16 +203,13 @@ const Hierarquia = ({ isAdmin }) => {
           });
         }
 
-        // Depois deletar do Firebase
         await deleteDoc(doc(db, 'hierarquia', id));
 
-        // Atualizar estado local
         setMembros((prev) => prev.filter((m) => m.id !== id));
         if (selectedMembro?.id === id) {
           setSelectedMembro(null);
         }
 
-        // 📋 Log de remoção
         console.log(`🗑️ Membro removido: ${membroData?.nome}`);
       } catch (error) {
         console.error('Erro ao excluir membro:', error);
@@ -226,7 +218,6 @@ const Hierarquia = ({ isAdmin }) => {
     }
   };
 
-  // ========== HANDLE SAVE ADVERTÊNCIA - AGORA ATUALIZA DISCORD ==========
   const handleSaveAdvertencia = async () => {
     if (!selectedMembro || !advertenciaForm.motivo || advertenciaSubmitting) {
       alert('Preencha o motivo!');
@@ -249,7 +240,6 @@ const Hierarquia = ({ isAdmin }) => {
 
       const advertênciasExistentes = membroData.advertências || [];
       
-      // Verificar duplicata
       const jaExiste = advertênciasExistentes.some(
         (adv) =>
           adv.tipo === novaAdvertencia.tipo &&
@@ -263,33 +253,10 @@ const Hierarquia = ({ isAdmin }) => {
         return;
       }
 
-      // Atualizar Firebase
       await updateDoc(membroRef, {
         advertências: [...advertênciasExistentes, novaAdvertencia],
       });
 
-      // 🔄 ATUALIZAR DISCORD - MENSAGEM DO MEMBRO
-      const membroAtualizado = {
-        ...selectedMembro,
-        advertências: [...advertênciasExistentes, novaAdvertencia],
-      };
-
-      if (selectedMembro.discordMessageId) {
-        await upsertDiscordMessage('hierarquia', selectedMembro.id, {
-          ...membroAtualizado,
-          discordMessageId: selectedMembro.discordMessageId,
-        });
-      }
-
-      // Atualizar estado local
-      setSelectedMembro(membroAtualizado);
-      setMembros((prevMembros) =>
-        prevMembros.map((m) =>
-          m.id === selectedMembro.id ? membroAtualizado : m
-        )
-      );
-
-      // Fechar modal
       setAdvertenciaModalOpen(false);
       setAdvertenciaForm({
         tipo: 'ausencia',
@@ -308,7 +275,6 @@ const Hierarquia = ({ isAdmin }) => {
     }
   };
 
-  // ========== HANDLE DELETE ADVERTÊNCIA - AGORA ATUALIZA DISCORD ==========
   const handleDeleteAdvertencia = async (advertenciaId) => {
     if (!selectedMembro) return;
 
@@ -322,72 +288,14 @@ const Hierarquia = ({ isAdmin }) => {
           (a) => a.id !== advertenciaId
         );
 
-        // Atualizar Firebase
         await updateDoc(membroRef, {
           advertências: novasAdvertencias,
         });
-
-        // 🔄 ATUALIZAR DISCORD - MENSAGEM DO MEMBRO
-        const membroAtualizado = {
-          ...selectedMembro,
-          advertências: novasAdvertencias,
-        };
-
-        if (selectedMembro.discordMessageId) {
-          await upsertDiscordMessage('hierarquia', selectedMembro.id, {
-            ...membroAtualizado,
-            discordMessageId: selectedMembro.discordMessageId,
-          });
-        }
-
-        // Atualizar estado local
-        setSelectedMembro(membroAtualizado);
-        setMembros((prevMembros) =>
-          prevMembros.map((m) =>
-            m.id === selectedMembro.id ? membroAtualizado : m
-          )
-        );
 
         console.log(`🗑️ Registro removido de ${selectedMembro.nome}`);
       } catch (error) {
         console.error('Erro ao excluir advertência:', error);
         alert('Erro ao excluir advertência. Tente novamente.');
-      }
-    }
-  };
-
-  // ========== HANDLE TOGGLE STATUS - ATUALIZADO ==========
-  const handleToggleStatus = async (membro) => {
-    if (window.confirm(`Alterar status de ${membro.nome}?`)) {
-      try {
-        const novoStatus = !membro.ativo;
-        
-        // Atualizar Firebase
-        await updateDoc(doc(db, 'hierarquia', membro.id), {
-          ativo: novoStatus,
-          updatedAt: new Date(),
-        });
-
-        // 🔄 ATUALIZAR DISCORD
-        if (membro.discordMessageId) {
-          await upsertDiscordMessage('hierarquia', membro.id, {
-            ...membro,
-            ativo: novoStatus,
-            discordMessageId: membro.discordMessageId,
-          });
-        }
-
-        // Atualizar estado local
-        const membroAtualizado = { ...membro, ativo: novoStatus };
-        setSelectedMembro(membroAtualizado);
-        setMembros((prev) =>
-          prev.map((m) => (m.id === membro.id ? membroAtualizado : m))
-        );
-
-        console.log(`🔄 Status alterado: ${membro.nome} → ${novoStatus ? 'ATIVO' : 'INATIVO'}`);
-      } catch (error) {
-        console.error('Erro ao alterar status:', error);
-        alert('Erro ao alterar status. Tente novamente.');
       }
     }
   };
@@ -408,8 +316,36 @@ const Hierarquia = ({ isAdmin }) => {
     setSelectedMembro(membro);
   };
 
-  const getPatenteColor = () => {
-    return 'text-white';
+  const handleToggleStatus = async (membro) => {
+    if (window.confirm(`Alterar status de ${membro.nome}?`)) {
+      try {
+        await updateDoc(doc(db, 'hierarquia', membro.id), {
+          ativo: !membro.ativo,
+          updatedAt: new Date(),
+        });
+
+        console.log(`🔄 Status alterado: ${membro.nome} → ${!membro.ativo ? 'ATIVO' : 'INATIVO'}`);
+      } catch (error) {
+        console.error('Erro ao alterar status:', error);
+        alert('Erro ao alterar status. Tente novamente.');
+      }
+    }
+  };
+
+  const getPatenteColor = (patente) => {
+    const cores = {
+      'Tenente Coronel': 'text-yellow-400',
+      'Major': 'text-yellow-300',
+      'Capitão': 'text-blue-400',
+      '1° Tenente': 'text-blue-300',
+      '2° Tenente': 'text-blue-200',
+      'Aspirante a Oficial': 'text-purple-400',
+      'Sub Tenente': 'text-green-400',
+      '1° Sargento': 'text-green-300',
+      '2° Sargento': 'text-green-200',
+      '3° Sargento': 'text-green-100',
+    };
+    return cores[patente] || 'text-white';
   };
 
   return (
@@ -426,16 +362,10 @@ const Hierarquia = ({ isAdmin }) => {
         )}
       </div>
 
-      <div
-        className="grid grid-cols-1 lg:grid-cols-3 gap-8"
-        style={{ gap: '32px' }}
-      >
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Lista de Membros */}
         <div className="lg:col-span-2">
-          <div
-            className="bg-gradient-to-br from-gray-800/50 to-gray-900/30 border border-blue-500/20 rounded-xl p-6 h-full"
-            style={{ minHeight: '500px' }}
-          >
+          <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/30 border border-blue-500/20 rounded-xl p-6 h-full">
             <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
               <Contact size={20} /> Estrutura de Comando
             </h3>
@@ -452,7 +382,7 @@ const Hierarquia = ({ isAdmin }) => {
                     key={patente}
                     className="border-b border-gray-700 pb-4 last:border-0 fade-in"
                   >
-                    <h4 className={`font-semibold mb-2 ${getPatenteColor()}`}>
+                    <h4 className={`font-semibold mb-2 ${getPatenteColor(patente)}`}>
                       {patente}{' '}
                       {membrosPatente.length > 1 &&
                         `(${membrosPatente.length})`}
@@ -500,12 +430,6 @@ const Hierarquia = ({ isAdmin }) => {
                               ).length || 0}{' '}
                               advertência(s)
                             </p>
-                            {/* ID do Discord (debug) - Remover depois */}
-                            {membro.discordMessageId && (
-                              <p className="text-xs text-gray-500 mt-1">
-                                🟢 ID: {membro.discordMessageId.substring(0, 8)}...
-                              </p>
-                            )}
                           </div>
                           <ChevronRight size={16} className="text-gray-500" />
                         </div>
@@ -532,10 +456,7 @@ const Hierarquia = ({ isAdmin }) => {
 
         {/* Detalhes do Membro Selecionado */}
         <div className="lg:col-span-1">
-          <div
-            className="bg-gradient-to-b from-gray-800/50 to-gray-900/30 border border-blue-500/20 rounded-xl p-6 h-full"
-            style={{ minHeight: '500px' }}
-          >
+          <div className="bg-gradient-to-b from-gray-800/50 to-gray-900/30 border border-blue-500/20 rounded-xl p-6 h-full">
             {selectedMembro ? (
               <>
                 <div className="flex items-center gap-3 mb-6">
@@ -552,7 +473,7 @@ const Hierarquia = ({ isAdmin }) => {
                   )}
                   <div>
                     <h3 className="font-bold text-lg">{selectedMembro.nome}</h3>
-                    <p className={`font-semibold ${getPatenteColor()}`}>
+                    <p className={`font-semibold ${getPatenteColor(selectedMembro.patente)}`}>
                       {selectedMembro.patente}
                     </p>
                     <div className="flex items-center gap-2 mt-1">
@@ -572,12 +493,6 @@ const Hierarquia = ({ isAdmin }) => {
                         /3 advertências
                       </div>
                     </div>
-                    {/* ID do Discord (debug) */}
-                    {selectedMembro.discordMessageId && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        🟢 Discord sincronizado
-                      </p>
-                    )}
                   </div>
                 </div>
 
@@ -659,7 +574,7 @@ const Hierarquia = ({ isAdmin }) => {
                   </div>
                 </div>
 
-                {/* Observações (Apenas Admin) */}
+                {/* Observações */}
                 {isAdmin && (
                   <div className="mb-6">
                     <h4 className="font-semibold text-gray-300 mb-2">
@@ -675,7 +590,7 @@ const Hierarquia = ({ isAdmin }) => {
                   </div>
                 )}
 
-                {/* Botões de Ação (Apenas Admin) */}
+                {/* Botões de Ação */}
                 {isAdmin && (
                   <div className="flex gap-2 pt-4 border-t border-gray-700">
                     <button
