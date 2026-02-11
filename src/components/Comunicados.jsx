@@ -748,7 +748,7 @@ const Comunicados = ({ isAdmin }) => {
                     {/* 🔗 LINK DIRETO - GRANDE E VISÍVEL */}
                     <div className="mt-6 p-4 bg-gray-800 rounded-lg border border-blue-500/40">
                       <a
-                        href={`https://forca-tatica.vercel.app/comunicados?id=${com.id}`}
+                        href={`/comunicados/${com.id}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center gap-3 text-blue-400 hover:text-blue-300 transition group"
