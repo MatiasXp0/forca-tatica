@@ -13,7 +13,7 @@ import './styles/fardamentos.css';
 import ComunicadoDetalhe from './pages/ComunicadoDetalhe';
 
 // Componentes
-import Layout from './components/Layout';
+import { Layout } from './components/Layout';
 import { Login } from './components/Login';
 import Comunicados from './components/Comunicados';
 import Fardamentos from './components/Fardamentos';
@@ -164,4 +164,4 @@ const App = () => {
 );
 };
 
-export default App;
+export default App; 
