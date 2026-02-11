@@ -58,6 +58,7 @@ const Hierarquia = ({ isAdmin }) => {
     'Capitão',
     '1° Tenente',
     '2° Tenente',
+    'Aspirante a Oficial ',
     'Sub Tenente',
     '1° Sargento',
     '2° Sargento',
