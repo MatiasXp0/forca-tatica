@@ -390,7 +390,7 @@ _createComunicadoEmbed(comunicado, action = 'upsert') {
   // TÍTULO COM URGÊNCIA
   let titulo = `📢 ${comunicado.titulo}`;
   if (comunicado.isUrgente) {
-    titulo = `⚠️⚠️ URGENTE: ${comunicado.titulo} ⚠️⚠️`;
+    titulo = `⚠️⚠️ URGENTE: ${comunicado.titulo} `;
   }
 
   const embed = {
