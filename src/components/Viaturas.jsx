@@ -8,10 +8,14 @@ import {
   onSnapshot,
   query,
   orderBy,
+  getDoc, // 👈 IMPORTANTE: Adicionar getDoc
 } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
 import { Car, Plus, Edit, Trash2, Save, X } from 'lucide-react';
-import { sendDiscordNotification } from '../utils/discordWebhooks';
+import {
+  upsertDiscordMessage,
+  deleteDiscordMessage,
+} from '../utils/discordManager'; // 👈 Substituir discordWebhooks
 
 export const Viaturas = ({ isAdmin }) => {
   const [viaturas, setViaturas] = useState([]);
@@ -52,6 +56,7 @@ export const Viaturas = ({ isAdmin }) => {
     return () => window.removeEventListener('keydown', handleEsc);
   }, [isModalOpen]);
 
+  // ========== HANDLE SAVE - ATUALIZADO ==========
   const handleSave = async () => {
     if (!formData.nome || !formData.modelo) {
       alert('Preencha pelo menos nome e modelo!');
@@ -60,20 +65,44 @@ export const Viaturas = ({ isAdmin }) => {
 
     const viaturaData = {
       ...formData,
-      createdAt: new Date(),
+      createdAt: editingViatura ? editingViatura.createdAt : new Date(),
+      updatedAt: new Date(),
       createdBy: auth.currentUser?.uid || '',
     };
 
     try {
+      let discordMessageId = null;
+
       if (editingViatura) {
+        // === EDIÇÃO: Atualizar viatura existente ===
         await updateDoc(doc(db, 'viaturas', editingViatura.id), viaturaData);
+        
+        // 🔄 Sincronizar com Discord (ATUALIZA a mensagem existente)
+        discordMessageId = await upsertDiscordMessage('viaturas', editingViatura.id, {
+          ...viaturaData,
+          id: editingViatura.id,
+          discordMessageId: editingViatura.discordMessageId // Mantém o ID existente
+        });
+        
       } else {
-        await addDoc(collection(db, 'viaturas'), viaturaData);
-      }
-      if (!editingViatura) {
-        await sendDiscordNotification('viaturas', viaturaData);
+        // === CRIAÇÃO: Nova viatura ===
+        const docRef = await addDoc(collection(db, 'viaturas'), viaturaData);
+        
+        // 🔄 Sincronizar com Discord (CRIA nova mensagem)
+        discordMessageId = await upsertDiscordMessage('viaturas', docRef.id, {
+          ...viaturaData,
+          id: docRef.id
+        });
+        
+        // 💾 SALVAR o ID da mensagem no Firebase!
+        if (discordMessageId) {
+          await updateDoc(doc(db, 'viaturas', docRef.id), {
+            discordMessageId: discordMessageId
+          });
+        }
       }
 
+      // ✅ Limpar estado e fechar modal
       setModalOpen(false);
       setEditingViatura(null);
       setFormData({
@@ -83,28 +112,57 @@ export const Viaturas = ({ isAdmin }) => {
         descricao: '',
         fotoURL: '',
       });
+
+      // 📋 Log de sucesso
+      console.log(`✅ Viatura ${editingViatura ? 'atualizada' : 'criada'}: ${viaturaData.nome}`);
+      
     } catch (error) {
       console.error('Erro ao salvar viatura:', error);
       alert('Erro ao salvar viatura. Tente novamente.');
     }
   };
 
+  // ========== HANDLE EDIT ==========
   const handleEdit = (viatura) => {
     setEditingViatura(viatura);
     setFormData({
       nome: viatura.nome,
       modelo: viatura.modelo,
-      velocidadeMax: viatura.velocidadeMax,
-      descricao: viatura.descricao,
+      velocidadeMax: viatura.velocidadeMax || '',
+      descricao: viatura.descricao || '',
       fotoURL: viatura.fotoURL || '',
     });
     setModalOpen(true);
   };
 
+  // ========== HANDLE DELETE - ATUALIZADO ==========
   const handleDelete = async (id) => {
     if (window.confirm('Tem certeza que deseja excluir esta viatura?')) {
       try {
+        // 🔍 Buscar dados da viatura ANTES de deletar
+        const viaturaDoc = await getDoc(doc(db, 'viaturas', id));
+        const viaturaData = viaturaDoc.data();
+
+        if (!viaturaData) {
+          throw new Error('Viatura não encontrada');
+        }
+
+        // 🔄 Remover do Discord PRIMEIRO
+        if (viaturaData?.discordMessageId) {
+          await deleteDiscordMessage('viaturas', {
+            ...viaturaData,
+            id: id,
+            discordMessageId: viaturaData.discordMessageId
+          });
+        }
+
+        // 🗑️ Depois deletar do Firebase
         await deleteDoc(doc(db, 'viaturas', id));
+
+        // 🎯 Atualizar estado local
+        setViaturas(prev => prev.filter(v => v.id !== id));
+
+        console.log(`🗑️ Viatura removida: ${viaturaData?.nome}`);
       } catch (error) {
         console.error('Erro ao excluir viatura:', error);
         alert('Erro ao excluir viatura. Tente novamente.');
@@ -112,6 +170,7 @@ export const Viaturas = ({ isAdmin }) => {
     }
   };
 
+  // ========== RENDER MODAL ==========
   const renderModal = () => {
     if (!isModalOpen) return null;
 
@@ -255,6 +314,13 @@ export const Viaturas = ({ isAdmin }) => {
                     <p className="text-gray-400 text-sm mt-1">
                       <span className="font-semibold">Velocidade Máx:</span>{' '}
                       {vtr.velocidadeMax} km/h
+                    </p>
+                  )}
+                  
+                  {/* ID do Discord (debug) - Remover depois */}
+                  {vtr.discordMessageId && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      🟢 Discord ID: {vtr.discordMessageId.substring(0, 8)}...
                     </p>
                   )}
                 </div>
