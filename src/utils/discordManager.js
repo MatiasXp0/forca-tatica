@@ -317,55 +317,62 @@ class DiscordManager {
 
   // ========== COMUNICADOS ==========
   async syncComunicado(comunicado, action = 'upsert') {
-    const webhookUrl = this.webhooks.comunicados;
-    if (!webhookUrl) {
-      this._log('error', '❌ Webhook comunicados não configurado');
-      return null;
-    }
-
-    const isDelete = action === 'delete';
-    const isHide = action === 'hide';
-    const isShow = action === 'show';
-    const url = `https://forca-tatica.vercel.app/comunicados?id=${comunicado.id}`;
-
-    try {
-      // DELETE ou OCULTAR = REMOVER MENSAGEM
-      if (isDelete || isHide) {
-        if (comunicado.discordMessageId) {
-          await this._deleteMessage(webhookUrl, comunicado.discordMessageId);
-          this._log('success', `🗑️ Comunicado removido do Discord: ${comunicado.titulo}`);
-        }
-        return true;
-      }
-
-      // MOSTRAR (republicar)
-      if (isShow) {
-        // Se já tem ID, deleta primeiro
-        if (comunicado.discordMessageId) {
-          await this._deleteMessage(webhookUrl, comunicado.discordMessageId);
-        }
-        // Depois publica novo
-        const embed = this._createComunicadoEmbed(comunicado, 'show');
-        const messageId = await this._sendMessage(webhookUrl, embed);
-        this._log('success', `✅ Comunicado republicado no Discord: ${comunicado.titulo}`);
-        return messageId;
-      }
-
-      // CRIAÇÃO - SÓ SE NÃO TEM ID
-      if (!isDelete && !comunicado.discordMessageId) {
-        const embed = this._createComunicadoEmbed(comunicado, 'upsert');
-        const messageId = await this._sendMessage(webhookUrl, embed);
-        this._log('success', `✅ Comunicado publicado no Discord: ${comunicado.titulo}`);
-        return messageId;
-      }
-
-      // EDIÇÃO - NÃO FAZ NADA
-      return comunicado.discordMessageId;
-    } catch (error) {
-      this._log('error', 'Erro ao sincronizar comunicado:', error);
-      return null;
-    }
+  const webhookUrl = this.webhooks.comunicados;
+  if (!webhookUrl) {
+    this._log('error', '❌ Webhook comunicados não configurado');
+    return null;
   }
+
+  const isDelete = action === 'delete';
+  const isHide = action === 'hide';
+  const isShow = action === 'show';
+  const url = `https://forca-tatica.vercel.app/comunicados/${comunicado.id}`;
+
+  try {
+    // DELETE ou OCULTAR = REMOVER MENSAGEM
+    if (isDelete || isHide) {
+      if (comunicado.discordMessageId) {
+        await this._deleteMessage(webhookUrl, comunicado.discordMessageId);
+        this._log('success', `🗑️ Comunicado removido do Discord: ${comunicado.titulo}`);
+      }
+      return true;
+    }
+
+    // MOSTRAR (republicar)
+    if (isShow) {
+      if (comunicado.discordMessageId) {
+        await this._deleteMessage(webhookUrl, comunicado.discordMessageId);
+      }
+      const embed = this._createComunicadoEmbed(comunicado, 'show');
+      
+      // ✅ ADICIONAR @MENÇÃO AQUI!
+      const messageId = await this._sendMessage(webhookUrl, embed, {
+        content: `<@&1450612198576750766>` // 👈 MENÇÃO DO CARGO
+      });
+      
+      this._log('success', `✅ Comunicado republicado no Discord: ${comunicado.titulo}`);
+      return messageId;
+    }
+
+    // CRIAÇÃO - SÓ SE NÃO TEM ID
+    if (!isDelete && !comunicado.discordMessageId) {
+      const embed = this._createComunicadoEmbed(comunicado, 'upsert');
+      
+      // ✅ ADICIONAR @MENÇÃO AQUI!
+      const messageId = await this._sendMessage(webhookUrl, embed, {
+        content: `<@&1450612198576750766>` // 👈 MENÇÃO DO CARGO
+      });
+      
+      this._log('success', `✅ Comunicado publicado no Discord: ${comunicado.titulo}`);
+      return messageId;
+    }
+
+    return comunicado.discordMessageId;
+  } catch (error) {
+    this._log('error', 'Erro ao sincronizar comunicado:', error);
+    return null;
+  }
+}
 
   // ========== EMBED DE COMUNICADO (GRANDE) ==========
   _createComunicadoEmbed(comunicado, action = 'upsert') {
@@ -442,29 +449,36 @@ class DiscordManager {
   }
 
   // ========== COMUNICAÇÃO COM DISCORD ==========
-  async _sendMessage(webhookUrl, embed) {
-    try {
-      const response = await fetch(`${webhookUrl}?wait=true`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          embeds: [embed],
-          username: 'Força Tática',
-          avatar_url: 'https://forca-tatica.vercel.app/logo.png',
-        }),
-      });
+  async _sendMessage(webhookUrl, embed, options = {}) {
+  try {
+    const payload = {
+      embeds: [embed],
+      username: 'Força Tática',
+      avatar_url: 'https://forca-tatica.vercel.app/logo.png',
+    };
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const data = await response.json();
-      return data.id;
-    } catch (error) {
-      this._log('error', 'Falha ao enviar:', error.message);
-      return null;
+    // ✅ ADICIONAR CONTEÚDO (MENÇÃO) SE EXISTIR
+    if (options.content) {
+      payload.content = options.content;
     }
+
+    const response = await fetch(`${webhookUrl}?wait=true`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.id;
+  } catch (error) {
+    this._log('error', 'Falha ao enviar:', error.message);
+    return null;
   }
+}
 
   async _editMessage(webhookUrl, messageId, embed) {
     try {
