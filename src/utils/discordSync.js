@@ -5,7 +5,7 @@ import { doc, updateDoc } from 'firebase/firestore';
 
 // ========== CONFIGURAÇÃO ==========
 // ESCOLHA: Webhook OU Bot - Configure apenas UM dos dois
-const USE_WEBHOOKS = false; // ← TRUE para Webhooks (RECOMENDADO), FALSE para Bot
+const USE_WEBHOOKS = true; // ← TRUE para Webhooks (RECOMENDADO), FALSE para Bot
 
 const CONFIG = {
   // WEBHOOKS (MELHOR para você)
