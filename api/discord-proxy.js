@@ -1,104 +1,67 @@
-// api/discord-proxy.js - VERSÃO COM LOGS DETALHADOS
+// api/discord-proxy.js
 export default async function handler(request, response) {
-  console.log('🔍 Proxy chamado. Método:', request.method);
-  
-  // CORS simplificado para testes
-  response.setHeader('Access-Control-Allow-Origin', '*');
+  // Configurar CORS - permitir apenas seu domínio
+  response.setHeader('Access-Control-Allow-Origin', 'https://forca-tatica.vercel.app');
   response.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   response.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   
+  // Lidar com preflight requests
   if (request.method === 'OPTIONS') {
-    console.log('📝 Respondendo preflight request');
     return response.status(200).end();
   }
 
+  // Apenas POST permitido
   if (request.method !== 'POST') {
-    console.log('❌ Método não permitido:', request.method);
     return response.status(405).json({ error: 'Método não permitido' });
   }
 
   try {
-    // 1. Log do body recebido
-    const body = await request.json();
-    console.log('📦 Body recebido:', JSON.stringify(body, null, 2));
-    
-    const { channelId, method, messageId, embed } = body;
+    // 1. Pegar dados do frontend
+    const { channelId, method, messageId, embed } = await request.json();
     
     if (!channelId) {
-      console.log('❌ channelId faltando');
       return response.status(400).json({ error: 'channelId é obrigatório' });
     }
 
-    // 2. Verificar token
+    // 2. Pegar token do bot das variáveis de ambiente DA VERCEL
     const BOT_TOKEN = process.env.VITE_DISCORD_BOT_TOKEN;
-    console.log('🔑 Token configurado?:', BOT_TOKEN ? 'SIM (primeiros 10 chars): ' + BOT_TOKEN.substring(0, 10) + '...' : 'NÃO');
     
     if (!BOT_TOKEN) {
-      console.log('❌ Token do bot não configurado no Vercel');
-      return response.status(500).json({ 
-        error: 'Configuração do bot incompleta',
-        details: 'VITE_DISCORD_BOT_TOKEN não encontrado nas variáveis de ambiente da Vercel'
-      });
+      console.error('Token do bot não configurado no Vercel');
+      return response.status(500).json({ error: 'Configuração do bot incompleta' });
     }
 
-    // 3. Montar URL do Discord
+    // 3. Montar URL para API do Discord
     let discordUrl = `https://discord.com/api/v10/channels/${channelId}/messages`;
-    let discordMethod = method || 'POST';
+    let discordMethod = method;
     
     if (messageId) {
       discordUrl += `/${messageId}`;
       discordMethod = method === 'DELETE' ? 'DELETE' : 'PATCH';
     }
-    
-    console.log('🌐 Fazendo request para Discord:', {
-      url: discordUrl,
-      method: discordMethod,
-      hasEmbed: !!embed
-    });
 
-    // 4. Fazer request para Discord
+    // 4. Fazer requisição para o Discord (do servidor, sem CORS)
     const discordResponse = await fetch(discordUrl, {
       method: discordMethod,
       headers: {
         'Authorization': `Bot ${BOT_TOKEN}`,
         'Content-Type': 'application/json',
       },
-      body: discordMethod === 'DELETE' ? undefined : JSON.stringify({ 
-        embeds: embed ? [embed] : [] 
-      }),
+      body: discordMethod === 'DELETE' ? undefined : JSON.stringify({ embeds: embed ? [embed] : [] }),
     });
 
-    console.log('📨 Resposta do Discord:', {
-      status: discordResponse.status,
-      statusText: discordResponse.statusText,
-      headers: Object.fromEntries(discordResponse.headers.entries())
-    });
-
-    // 5. Processar resposta
-    let responseData;
-    const contentType = discordResponse.headers.get('content-type');
-    
-    if (contentType && contentType.includes('application/json')) {
-      responseData = await discordResponse.json();
-      console.log('📊 Data da resposta:', responseData);
-    } else if (discordResponse.status === 204) {
-      responseData = { success: true };
-    } else {
-      responseData = await discordResponse.text();
-      console.log('📝 Texto da resposta:', responseData);
+    // 5. Passar headers importantes (como rate limiting) de volta
+    if (discordResponse.headers.has('Retry-After')) {
+      response.setHeader('Retry-After', discordResponse.headers.get('Retry-After'));
     }
 
-    // 6. Retornar para frontend
-    return response.status(discordResponse.status).json(responseData);
+    const data = discordResponse.status === 204 ? { success: true } : await discordResponse.json();
+    
+    // 6. Retornar resposta do Discord para o frontend
+    return response.status(discordResponse.status).json(data);
     
   } catch (error) {
-    console.error('💥 ERRO NO PROXY:', error);
-    console.error('Stack:', error.stack);
-    
-    return response.status(500).json({ 
-      error: 'Falha na comunicação com Discord',
-      details: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    });
+    console.error('Erro no proxy para Discord:', error);
+    return response.status(500).json({ error: 'Falha na comunicação com Discord' });
   }
 }
