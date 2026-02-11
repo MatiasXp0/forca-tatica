@@ -19,7 +19,7 @@ import {
   deleteDiscordMessage,
 } from '../utils/discordManager';
 
-// Componente de imagem com fallback elegante (CORRIGIDO)
+// Componente de imagem com fallback elegante (corrigido)
 const FardaImage = ({ farda, size = 'medium' }) => {
   const [imgError, setImgError] = useState(false);
 
@@ -277,15 +277,15 @@ const Fardamentos = ({ isAdmin }) => {
         )}
       </div>
 
-      {/* ===== LAYOUT PRINCIPAL ===== */}
-      <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 xl:gap-10">
+      {/* ===== LAYOUT PRINCIPAL - COM SCROLL INDEPENDENTE ===== */}
+      <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 xl:gap-10 h-[calc(100vh-180px)] lg:h-[calc(100vh-160px)]">
         
         {/* === COLUNA ESQUERDA - CATÁLOGO === */}
-        <div className="w-full lg:w-7/12 xl:w-8/12">
+        <div className="w-full lg:w-7/12 xl:w-8/12 h-full overflow-y-auto">
           <div className="bg-gradient-to-br from-gray-800/40 to-gray-900/40 backdrop-blur-sm border border-blue-500/20 rounded-2xl p-4 lg:p-5 xl:p-6 flex flex-col w-full h-full shadow-xl">
             
             {/* Título da seção */}
-            <div className="flex justify-between items-center mb-4 lg:mb-5">
+            <div className="flex justify-between items-center mb-4 lg:mb-5 flex-shrink-0">
               <h3 className="font-semibold text-base lg:text-lg flex items-center gap-2">
                 <div className="p-1.5 lg:p-2 rounded-lg bg-blue-500/20 border border-blue-500/30">
                   <Layers size={18} className="lg:w-5 lg:h-5 text-blue-400" />
@@ -297,7 +297,7 @@ const Fardamentos = ({ isAdmin }) => {
               </span>
             </div>
 
-            {/* Lista de fardamentos - SCROLL OTIMIZADO */}
+            {/* Lista de fardamentos - AGORA OCUPA ALTURA RESTANTE COM SCROLL PRÓPRIO */}
             <div className="flex-1 overflow-hidden">
               {fardamentos.length === 0 ? (
                 <div className="text-center py-12 lg:py-16">
@@ -312,7 +312,7 @@ const Fardamentos = ({ isAdmin }) => {
                   )}
                 </div>
               ) : (
-                <div className="space-y-3 lg:space-y-2 max-h-[calc(100vh-280px)] lg:max-h-[calc(100vh-240px)] overflow-y-auto pr-2 lg:pr-3 scroll-smooth">
+                <div className="h-full overflow-y-auto pr-2 lg:pr-3 space-y-3 lg:space-y-2 scroll-smooth">
                   {fardamentos.map((farda) => {
                     const colors = getFardaColor(farda.nome);
                     const isSelected = selectedFarda?.id === farda.id;
@@ -409,13 +409,13 @@ const Fardamentos = ({ isAdmin }) => {
           </div>
         </div>
 
-        {/* === COLUNA DIREITA - COMPOSIÇÃO === (INDENTAÇÃO CORRIGIDA) */}
-        <div className="w-full lg:w-6/12 xl:w-5/12">
-          <div className="bg-gradient-to-b from-gray-800/40 to-gray-900/40 backdrop-blur-sm border border-blue-500/20 rounded-2xl p-5 lg:p-6 xl:p-7 flex flex-col w-full h-full shadow-xl min-h-[400px] lg:min-h-[600px]">
+        {/* === COLUNA DIREITA - COMPOSIÇÃO === */}
+        <div className="w-full lg:w-6/12 xl:w-5/12 h-full overflow-y-auto">
+          <div className="bg-gradient-to-b from-gray-800/40 to-gray-900/40 backdrop-blur-sm border border-blue-500/20 rounded-2xl p-5 lg:p-6 xl:p-7 flex flex-col w-full h-full shadow-xl min-h-[400px] lg:min-h-0">
             {selectedFarda ? (
               <>
                 {/* Header da composição */}
-                <div className="text-center mb-5 lg:mb-6">
+                <div className="text-center mb-5 lg:mb-6 flex-shrink-0">
                   <div className="relative inline-block mx-auto mb-4">
                     <FardaImage farda={selectedFarda} size="large" />
                     <div
@@ -433,7 +433,7 @@ const Fardamentos = ({ isAdmin }) => {
                 </div>
 
                 {/* Métricas */}
-                <div className="grid grid-cols-2 gap-3 lg:gap-4 mb-5 lg:mb-6">
+                <div className="grid grid-cols-2 gap-3 lg:gap-4 mb-5 lg:mb-6 flex-shrink-0">
                   <div className="bg-gray-900/50 rounded-xl p-3 lg:p-4 text-center border border-gray-700/50">
                     <div className="text-xl lg:text-2xl font-bold text-blue-400">{selectedFarda.pecas?.length || 0}</div>
                     <div className="text-xs lg:text-sm text-gray-400 mt-1">Peças</div>
@@ -450,13 +450,13 @@ const Fardamentos = ({ isAdmin }) => {
                   </div>
                 </div>
 
-                {/* Lista de peças - COM QUEBRA DE LINHA OTIMIZADA */}
-                <div className="flex-1 flex flex-col overflow-hidden">
-                  <h4 className="font-semibold text-gray-300 mb-3 flex items-center gap-2 text-sm lg:text-base border-b border-gray-700/80 pb-2">
+                {/* Lista de peças - COM QUEBRA DE LINHA OTIMIZADA E SCROLL PRÓPRIO */}
+                <div className="flex-1 overflow-hidden">
+                  <h4 className="font-semibold text-gray-300 mb-3 flex items-center gap-2 text-sm lg:text-base border-b border-gray-700/80 pb-2 flex-shrink-0">
                     <Layers size={18} className="text-blue-400" />
                     COMPOSIÇÃO
                   </h4>
-                  <div className="flex-1 overflow-y-auto pr-1 space-y-3 scroll-smooth">
+                  <div className="h-full overflow-y-auto pr-1 space-y-3 scroll-smooth">
                     {selectedFarda.pecas && selectedFarda.pecas.length > 0 ? (
                       selectedFarda.pecas.map((peca, index) => (
                         <div
@@ -469,7 +469,6 @@ const Fardamentos = ({ isAdmin }) => {
                             >
                               <span className="text-sm lg:text-base font-bold text-white">{index + 1}</span>
                             </div>
-                            {/* min-w-0 + break-words garantem quebra adequada */}
                             <div className="flex-1 min-w-0">
                               <h5 className="font-semibold text-white text-sm lg:text-base break-words">
                                 {typeof peca === 'string'
@@ -505,7 +504,7 @@ const Fardamentos = ({ isAdmin }) => {
 
                 {/* Botões admin */}
                 {isAdmin && (
-                  <div className="flex gap-3 lg:gap-4 pt-4 lg:pt-5 border-t border-gray-700/80 mt-4 lg:mt-5">
+                  <div className="flex gap-3 lg:gap-4 pt-4 lg:pt-5 border-t border-gray-700/80 mt-4 lg:mt-5 flex-shrink-0">
                     <button
                       onClick={() => handleEditFarda(selectedFarda)}
                       className="flex-1 bg-gradient-to-r from-yellow-600/20 to-yellow-700/10 hover:from-yellow-600/30 hover:to-yellow-700/20 text-yellow-400 py-2.5 lg:py-3 rounded-lg font-medium flex items-center justify-center gap-2 transition-all border border-yellow-500/30 hover:border-yellow-500/50 text-sm lg:text-base"
