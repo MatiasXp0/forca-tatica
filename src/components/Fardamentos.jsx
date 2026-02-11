@@ -63,7 +63,6 @@ const Fardamentos = ({ isAdmin }) => {
     pecas: [{ tipo: '', numero: '', textura: '', descricao: '' }],
   });
 
-  // Buscar dados em tempo real
   useEffect(() => {
     const q = query(collection(db, 'fardamentos'), orderBy('createdAt', 'desc'));
     return onSnapshot(q, (snap) => {
@@ -71,7 +70,6 @@ const Fardamentos = ({ isAdmin }) => {
     });
   }, []);
 
-  // Fechar modal com ESC
   useEffect(() => {
     const handleEsc = (e) => {
       if (e.key === 'Escape' && isModalOpen) {
@@ -89,7 +87,6 @@ const Fardamentos = ({ isAdmin }) => {
     return () => window.removeEventListener('keydown', handleEsc);
   }, [isModalOpen]);
 
-  // ========== SALVAR ==========
   const handleSaveFarda = async () => {
     if (!formData.nome) {
       alert('Preencha o nome do fardamento!');
@@ -151,7 +148,6 @@ const Fardamentos = ({ isAdmin }) => {
     }
   };
 
-  // ========== DELETAR ==========
   const handleDeleteFarda = async (id) => {
     if (window.confirm('Tem certeza que deseja excluir este fardamento?')) {
       try {
@@ -179,7 +175,6 @@ const Fardamentos = ({ isAdmin }) => {
     }
   };
 
-  // ========== EDITAR ==========
   const handleEditFarda = (farda) => {
     setEditingFarda(farda);
     let pecasFormatadas = [];
@@ -251,12 +246,14 @@ const Fardamentos = ({ isAdmin }) => {
     setModalOpen(true);
   };
 
-  // ========== SELECIONAR ==========
-  const handleViewFarda = (farda) => setSelectedFarda(farda);
+  const handleViewFarda = (farda) => {
+    console.log('Fardamento selecionado:', farda);
+    setSelectedFarda(farda);
+  };
 
   return (
     <div className="fade-in w-full max-w-full overflow-x-hidden">
-      {/* ===== HEADER ===== */}
+      {/* HEADER */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 lg:mb-8">
         <div>
           <h2 className="text-xl lg:text-2xl font-bold flex items-center gap-2 lg:gap-3">
@@ -277,14 +274,12 @@ const Fardamentos = ({ isAdmin }) => {
         )}
       </div>
 
-      {/* ===== LAYOUT PRINCIPAL ===== */}
+      {/* LAYOUT PRINCIPAL - SIMPLES, SEM ALTURA FIXA */}
       <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 xl:gap-10">
         
-        {/* === COLUNA ESQUERDA - CATÁLOGO === */}
+        {/* COLUNA ESQUERDA - CATÁLOGO */}
         <div className="w-full lg:w-7/12 xl:w-8/12">
-          <div className="bg-gradient-to-br from-gray-800/40 to-gray-900/40 backdrop-blur-sm border border-blue-500/20 rounded-2xl p-4 lg:p-5 xl:p-6 flex flex-col w-full h-full shadow-xl">
-            
-            {/* Título da seção */}
+          <div className="bg-gradient-to-br from-gray-800/40 to-gray-900/40 backdrop-blur-sm border border-blue-500/20 rounded-2xl p-4 lg:p-5 xl:p-6 flex flex-col w-full shadow-xl">
             <div className="flex justify-between items-center mb-4 lg:mb-5">
               <h3 className="font-semibold text-base lg:text-lg flex items-center gap-2">
                 <div className="p-1.5 lg:p-2 rounded-lg bg-blue-500/20 border border-blue-500/30">
@@ -297,8 +292,8 @@ const Fardamentos = ({ isAdmin }) => {
               </span>
             </div>
 
-            {/* Lista de fardamentos - SCROLL OTIMIZADO */}
-            <div className="flex-1 overflow-hidden">
+            {/* LISTA - SCROLL NORMAL */}
+            <div className="space-y-3 lg:space-y-2 max-h-[500px] lg:max-h-[600px] overflow-y-auto pr-2 lg:pr-3">
               {fardamentos.length === 0 ? (
                 <div className="text-center py-12 lg:py-16">
                   <div className="w-20 h-20 lg:w-24 lg:h-24 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 flex items-center justify-center">
@@ -312,109 +307,102 @@ const Fardamentos = ({ isAdmin }) => {
                   )}
                 </div>
               ) : (
-                <div className="space-y-3 lg:space-y-2 max-h-[calc(100vh-280px)] lg:max-h-[calc(100vh-240px)] overflow-y-auto pr-2 lg:pr-3 scroll-smooth">
-                  {fardamentos.map((farda) => {
-                    const colors = getFardaColor(farda.nome);
-                    const isSelected = selectedFarda?.id === farda.id;
-                    return (
-                      <div
-                        key={farda.id}
-                        className={`
-                          group relative flex items-start lg:items-center p-3 lg:p-4 rounded-xl cursor-pointer 
-                          transition-all duration-200 border
-                          ${isSelected 
-                            ? `${colors.bg} border-2 ${colors.borderStrong} shadow-lg shadow-blue-500/20 scale-[1.02]` 
-                            : 'bg-gray-900/30 hover:bg-gray-800/60 border border-gray-700/50 hover:border-blue-500/30 hover:shadow-md'
-                          }
-                        `}
-                        onClick={() => handleViewFarda(farda)}
-                      >
-                        {/* Imagem */}
-                        <div className="flex-shrink-0 mr-3 lg:mr-4">
-                          <FardaImage farda={farda} size="small" />
-                        </div>
+                fardamentos.map((farda) => {
+                  const colors = getFardaColor(farda.nome);
+                  const isSelected = selectedFarda?.id === farda.id;
+                  return (
+                    <div
+                      key={farda.id}
+                      className={`
+                        group relative flex items-start lg:items-center p-3 lg:p-4 rounded-xl cursor-pointer 
+                        transition-all duration-200 border
+                        ${isSelected 
+                          ? `${colors.bg} border-2 ${colors.borderStrong} shadow-lg shadow-blue-500/20 scale-[1.02]` 
+                          : 'bg-gray-900/30 hover:bg-gray-800/60 border border-gray-700/50 hover:border-blue-500/30 hover:shadow-md'
+                        }
+                      `}
+                      onClick={() => handleViewFarda(farda)}
+                    >
+                      <div className="flex-shrink-0 mr-3 lg:mr-4">
+                        <FardaImage farda={farda} size="small" />
+                      </div>
 
-                        {/* Conteúdo */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1 sm:gap-2">
-                            <div className="flex-1">
-                              <div className="flex flex-wrap items-center gap-2 mb-0.5">
-                                <h4 className={`font-bold text-sm lg:text-base truncate ${isSelected ? 'text-white' : 'text-white group-hover:text-blue-300'}`}>
-                                  {farda.nome}
-                                </h4>
-                                <span className={`px-2 py-0.5 rounded-full text-[10px] lg:text-xs font-medium ${colors.badge} border ${colors.border}`}>
-                                  {farda.pecas?.length || 0} peças
-                                </span>
-                              </div>
-
-                              {farda.descricao && (
-                                <p className="text-xs lg:text-sm text-gray-400 line-clamp-1 lg:line-clamp-2">
-                                  {farda.descricao}
-                                </p>
-                              )}
-
-                              {farda.pecas && farda.pecas.length > 0 && (
-                                <div className="flex items-center gap-1 lg:gap-1.5 mt-1.5 flex-wrap">
-                                  {farda.pecas.slice(0, 4).map((peca, idx) => {
-                                    let display = '';
-                                    if (typeof peca === 'string') {
-                                      display = peca.split('|')[0].trim();
-                                    } else {
-                                      display = `${peca.tipo?.toUpperCase() || ''} ${peca.numero || ''}`.trim();
-                                    }
-                                    if (display.length > 8) display = display.slice(0, 8) + '…';
-                                    return (
-                                      <span
-                                        key={idx}
-                                        className="text-[10px] lg:text-xs px-2 py-0.5 bg-gray-800/80 rounded-full text-gray-300 border border-gray-700/80"
-                                      >
-                                        {display}
-                                      </span>
-                                    );
-                                  })}
-                                  {farda.pecas.length > 4 && (
-                                    <span className="text-[10px] lg:text-xs px-2 py-0.5 bg-gray-800/80 rounded-lg text-gray-500">
-                                      +{farda.pecas.length - 4}
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Data (desktop) */}
-                            <div className="hidden lg:flex items-center gap-1 text-xs text-gray-500">
-                              <Calendar size={12} />
-                              <span>
-                                {farda.createdAt?.toDate
-                                  ? new Date(farda.createdAt.toDate()).toLocaleDateString('pt-BR')
-                                  : farda.createdAt
-                                  ? new Date(farda.createdAt).toLocaleDateString('pt-BR')
-                                  : 'N/A'}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1 sm:gap-2">
+                          <div className="flex-1">
+                            <div className="flex flex-wrap items-center gap-2 mb-0.5">
+                              <h4 className={`font-bold text-sm lg:text-base truncate ${isSelected ? 'text-white' : 'text-white group-hover:text-blue-300'}`}>
+                                {farda.nome}
+                              </h4>
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] lg:text-xs font-medium ${colors.badge} border ${colors.border}`}>
+                                {farda.pecas?.length || 0} peças
                               </span>
                             </div>
-                            <ChevronRight size={16} className="text-gray-500 group-hover:text-blue-400 transition-colors lg:hidden" />
-                          </div>
-                        </div>
 
-                        {/* Indicador de seleção (desktop) */}
-                        {isSelected && (
-                          <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-1 h-8 bg-blue-500 rounded-full shadow-lg shadow-blue-500/50 hidden lg:block"></div>
-                        )}
+                            {farda.descricao && (
+                              <p className="text-xs lg:text-sm text-gray-400 line-clamp-1 lg:line-clamp-2">
+                                {farda.descricao}
+                              </p>
+                            )}
+
+                            {farda.pecas && farda.pecas.length > 0 && (
+                              <div className="flex items-center gap-1 lg:gap-1.5 mt-1.5 flex-wrap">
+                                {farda.pecas.slice(0, 4).map((peca, idx) => {
+                                  let display = '';
+                                  if (typeof peca === 'string') {
+                                    display = peca.split('|')[0].trim();
+                                  } else {
+                                    display = `${peca.tipo?.toUpperCase() || ''} ${peca.numero || ''}`.trim();
+                                  }
+                                  if (display.length > 8) display = display.slice(0, 8) + '…';
+                                  return (
+                                    <span
+                                      key={idx}
+                                      className="text-[10px] lg:text-xs px-2 py-0.5 bg-gray-800/80 rounded-full text-gray-300 border border-gray-700/80"
+                                    >
+                                      {display}
+                                    </span>
+                                  );
+                                })}
+                                {farda.pecas.length > 4 && (
+                                  <span className="text-[10px] lg:text-xs px-2 py-0.5 bg-gray-800/80 rounded-lg text-gray-500">
+                                    +{farda.pecas.length - 4}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="hidden lg:flex items-center gap-1 text-xs text-gray-500">
+                            <Calendar size={12} />
+                            <span>
+                              {farda.createdAt?.toDate
+                                ? new Date(farda.createdAt.toDate()).toLocaleDateString('pt-BR')
+                                : farda.createdAt
+                                ? new Date(farda.createdAt).toLocaleDateString('pt-BR')
+                                : 'N/A'}
+                            </span>
+                          </div>
+                          <ChevronRight size={16} className="text-gray-500 group-hover:text-blue-400 transition-colors lg:hidden" />
+                        </div>
                       </div>
-                    );
-                  })}
-                </div>
+
+                      {isSelected && (
+                        <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-1 h-8 bg-blue-500 rounded-full shadow-lg shadow-blue-500/50 hidden lg:block"></div>
+                      )}
+                    </div>
+                  );
+                })
               )}
             </div>
           </div>
         </div>
 
-        {/* === COLUNA DIREITA - COMPOSIÇÃO === (INDENTAÇÃO CORRIGIDA) */}
+        {/* COLUNA DIREITA - COMPOSIÇÃO */}
         <div className="w-full lg:w-6/12 xl:w-5/12">
-          <div className="bg-gradient-to-b from-gray-800/40 to-gray-900/40 backdrop-blur-sm border border-blue-500/20 rounded-2xl p-5 lg:p-6 xl:p-7 flex flex-col w-full h-full shadow-xl min-h-[400px] lg:min-h-[600px]">
+          <div className="bg-gradient-to-b from-gray-800/40 to-gray-900/40 backdrop-blur-sm border border-blue-500/20 rounded-2xl p-5 lg:p-6 xl:p-7 flex flex-col w-full shadow-xl min-h-[500px] lg:min-h-[600px]">
             {selectedFarda ? (
               <>
-                {/* Header da composição */}
                 <div className="text-center mb-5 lg:mb-6">
                   <div className="relative inline-block mx-auto mb-4">
                     <FardaImage farda={selectedFarda} size="large" />
@@ -432,7 +420,6 @@ const Fardamentos = ({ isAdmin }) => {
                   )}
                 </div>
 
-                {/* Métricas */}
                 <div className="grid grid-cols-2 gap-3 lg:gap-4 mb-5 lg:mb-6">
                   <div className="bg-gray-900/50 rounded-xl p-3 lg:p-4 text-center border border-gray-700/50">
                     <div className="text-xl lg:text-2xl font-bold text-blue-400">{selectedFarda.pecas?.length || 0}</div>
@@ -450,13 +437,12 @@ const Fardamentos = ({ isAdmin }) => {
                   </div>
                 </div>
 
-                {/* Lista de peças - COM QUEBRA DE LINHA OTIMIZADA */}
                 <div className="flex-1 flex flex-col overflow-hidden">
                   <h4 className="font-semibold text-gray-300 mb-3 flex items-center gap-2 text-sm lg:text-base border-b border-gray-700/80 pb-2">
                     <Layers size={18} className="text-blue-400" />
                     COMPOSIÇÃO
                   </h4>
-                  <div className="flex-1 overflow-y-auto pr-1 space-y-3 scroll-smooth">
+                  <div className="flex-1 overflow-y-auto pr-1 space-y-3">
                     {selectedFarda.pecas && selectedFarda.pecas.length > 0 ? (
                       selectedFarda.pecas.map((peca, index) => (
                         <div
@@ -469,7 +455,6 @@ const Fardamentos = ({ isAdmin }) => {
                             >
                               <span className="text-sm lg:text-base font-bold text-white">{index + 1}</span>
                             </div>
-                            {/* min-w-0 + break-words garantem quebra adequada */}
                             <div className="flex-1 min-w-0">
                               <h5 className="font-semibold text-white text-sm lg:text-base break-words">
                                 {typeof peca === 'string'
@@ -503,7 +488,6 @@ const Fardamentos = ({ isAdmin }) => {
                   </div>
                 </div>
 
-                {/* Botões admin */}
                 {isAdmin && (
                   <div className="flex gap-3 lg:gap-4 pt-4 lg:pt-5 border-t border-gray-700/80 mt-4 lg:mt-5">
                     <button
@@ -522,7 +506,6 @@ const Fardamentos = ({ isAdmin }) => {
                 )}
               </>
             ) : (
-              /* Placeholder elegante quando nada selecionado */
               <div className="flex flex-col items-center justify-center h-full min-h-[400px] lg:min-h-[500px] text-center">
                 <div className="w-24 h-24 lg:w-32 lg:h-32 mb-6 rounded-3xl bg-gradient-to-br from-gray-800/50 to-gray-900/50 border-2 border-dashed border-gray-700 flex items-center justify-center">
                   <Shirt size={48} className="lg:w-16 lg:h-16 text-gray-600" />
@@ -776,7 +759,7 @@ const Fardamentos = ({ isAdmin }) => {
           </div>
         </div>
       )}
-    </div>  
+    </div>
   );
 };
 
