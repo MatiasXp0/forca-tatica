@@ -8,6 +8,7 @@ import {
   onSnapshot,
   query,
   orderBy,
+  getDoc, // 👈 IMPORTANTE: Adicionar getDoc
 } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
 import {
@@ -30,7 +31,10 @@ import {
   Link as LinkIcon,
 } from 'lucide-react';
 import { formatContent } from './utils/markdownFormatter';
-import { sendDiscordNotification } from '../utils/discordWebhooks';
+import {
+  upsertDiscordMessage,
+  deleteDiscordMessage,
+} from '../utils/discordManager'; // 👈 Substituir discordWebhooks
 
 const Comunicados = ({ isAdmin }) => {
   const [comunicados, setComunicados] = useState([]);
@@ -84,6 +88,7 @@ const Comunicados = ({ isAdmin }) => {
     setExpandedComId(expandedComId === id ? null : id);
   };
 
+  // ========== HANDLE SAVE - ATUALIZADO ==========
   const handleSaveComunicado = async () => {
     if (!formData.titulo || !formData.conteudo) {
       alert('Preencha título e conteúdo!');
@@ -92,33 +97,59 @@ const Comunicados = ({ isAdmin }) => {
 
     const comunicadoData = {
       ...formData,
-      createdAt: new Date(),
+      createdAt: editingCom ? editingCom.createdAt : new Date(),
+      updatedAt: new Date(),
       createdBy: auth.currentUser?.uid || '',
-      isActive: true,
+      isActive: editingCom ? editingCom.isActive : true,
     };
 
     try {
+      let discordMessageId = null;
+
       if (editingCom) {
+        // === EDIÇÃO: Atualizar comunicado existente ===
         await updateDoc(doc(db, 'comunicados', editingCom.id), comunicadoData);
+        
+        // 🔄 Sincronizar com Discord (ATUALIZA a mensagem existente)
+        discordMessageId = await upsertDiscordMessage('comunicados', editingCom.id, {
+          ...comunicadoData,
+          id: editingCom.id,
+          discordMessageId: editingCom.discordMessageId // Mantém o ID existente
+        });
+        
       } else {
-        await addDoc(collection(db, 'comunicados'), comunicadoData);
+        // === CRIAÇÃO: Novo comunicado ===
+        const docRef = await addDoc(collection(db, 'comunicados'), comunicadoData);
+        
+        // 🔄 Sincronizar com Discord (CRIA nova mensagem)
+        discordMessageId = await upsertDiscordMessage('comunicados', docRef.id, {
+          ...comunicadoData,
+          id: docRef.id
+        });
+        
+        // 💾 SALVAR o ID da mensagem no Firebase!
+        if (discordMessageId) {
+          await updateDoc(doc(db, 'comunicados', docRef.id), {
+            discordMessageId: discordMessageId
+          });
+        }
       }
 
-      // ⭐⭐ ADICIONE ESTA LINHA ⭐⭐
-      // Envia notificação para Discord APENAS se for um novo comunicado (não edição)
-      if (!editingCom) {
-        await sendDiscordNotification('comunicados', comunicadoData);
-      }
-
+      // ✅ Limpar estado e fechar modal
       setModalOpen(false);
       setEditingCom(null);
       setFormData({ titulo: '', tipo: 'INFORMATIVO', conteudo: '' });
+
+      // 📋 Log de sucesso
+      console.log(`✅ Comunicado ${editingCom ? 'atualizado' : 'publicado'}: ${comunicadoData.titulo}`);
+      
     } catch (error) {
       console.error('Erro ao salvar comunicado:', error);
       alert('Erro ao salvar comunicado. Tente novamente.');
     }
   };
 
+  // ========== HANDLE EDIT ==========
   const handleEditCom = (com) => {
     setEditingCom(com);
     setFormData({
@@ -129,10 +160,37 @@ const Comunicados = ({ isAdmin }) => {
     setModalOpen(true);
   };
 
+  // ========== HANDLE DELETE - ATUALIZADO ==========
   const handleDeleteCom = async (id) => {
     if (window.confirm('Tem certeza que deseja excluir este comunicado?')) {
       try {
+        // 🔍 Buscar dados do comunicado ANTES de deletar
+        const comDoc = await getDoc(doc(db, 'comunicados', id));
+        const comData = comDoc.data();
+
+        if (!comData) {
+          throw new Error('Comunicado não encontrado');
+        }
+
+        // 🔄 Remover do Discord PRIMEIRO
+        if (comData?.discordMessageId) {
+          await deleteDiscordMessage('comunicados', {
+            ...comData,
+            id: id,
+            discordMessageId: comData.discordMessageId
+          });
+        }
+
+        // 🗑️ Depois deletar do Firebase
         await deleteDoc(doc(db, 'comunicados', id));
+
+        // 🎯 Atualizar estado local
+        setComunicados(prev => prev.filter(c => c.id !== id));
+        if (expandedComId === id) {
+          setExpandedComId(null);
+        }
+
+        console.log(`🗑️ Comunicado removido: ${comData?.titulo}`);
       } catch (error) {
         console.error('Erro ao excluir comunicado:', error);
         alert('Erro ao excluir comunicado. Tente novamente.');
@@ -140,11 +198,23 @@ const Comunicados = ({ isAdmin }) => {
     }
   };
 
+  // ========== TOGGLE STATUS ==========
   const toggleComStatus = async (com) => {
     try {
       await updateDoc(doc(db, 'comunicados', com.id), {
         isActive: !com.isActive,
       });
+
+      // 🔄 Atualizar no Discord também (opcional)
+      if (com.discordMessageId) {
+        await upsertDiscordMessage('comunicados', com.id, {
+          ...com,
+          isActive: !com.isActive,
+          discordMessageId: com.discordMessageId
+        });
+      }
+
+      console.log(`📢 Comunicado ${com.titulo} ${!com.isActive ? 'visível' : 'oculto'}`);
     } catch (error) {
       console.error('Erro ao alterar status:', error);
       alert('Erro ao alterar status. Tente novamente.');
@@ -284,6 +354,12 @@ const Comunicados = ({ isAdmin }) => {
                               minute: '2-digit',
                             })}
                       </p>
+                      {/* ID do Discord (debug) - Remover depois */}
+                      {com.discordMessageId && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          🟢 Discord ID: {com.discordMessageId.substring(0, 8)}...
+                        </p>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
