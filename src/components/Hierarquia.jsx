@@ -1,3 +1,8 @@
+import {
+  upsertDiscordMessage,
+  deleteDiscordMessage,
+  sendDiscordLog,
+} from '../utils/discordSync';
 import React, { useState, useEffect } from 'react';
 import {
   collection,
@@ -113,42 +118,43 @@ const Hierarquia = ({ isAdmin }) => {
     return () => window.removeEventListener('keydown', handleEsc);
   }, [isModalOpen, isAdvertenciaModalOpen]);
 
-  const handleSaveMembro = async () => {
-    if (!formData.nome || !formData.patente) {
-      alert('Preencha nome e patente!');
-      return;
-    }
+  const handleDeleteMembro = async (id) => {
+    if (window.confirm('Tem certeza que deseja excluir este membro?')) {
+      try {
+        // Buscar dados antes de deletar
+        const membroDoc = await getDoc(doc(db, 'hierarquia', id));
+        const membroData = membroDoc.data();
 
-    const membroData = {
-      ...formData,
-      advertências: [],
-      createdAt: new Date(),
-      createdBy: auth.currentUser?.uid || '',
-    };
+        // 🔄 Remover do Discord primeiro
+        if (membroData?.discordMessageId) {
+          await deleteDiscordMessage('hierarquia', {
+            ...membroData,
+            id: id,
+          });
+        }
 
-    try {
-      if (editingMembro) {
-        await updateDoc(doc(db, 'hierarquia', editingMembro.id), membroData);
-      } else {
-        await addDoc(collection(db, 'hierarquia'), membroData);
+        // Depois deletar do Firebase
+        await deleteDoc(doc(db, 'hierarquia', id));
+
+        // Atualizar estado local
+        setMembros((prev) => prev.filter((m) => m.id !== id));
+        if (selectedMembro?.id === id) {
+          setSelectedMembro(null);
+        }
+
+        // Log de remoção
+        await sendDiscordLog(
+          `🗑️ Membro removido: **${membroData?.nome || 'Desconhecido'}**`,
+          'warning'
+        );
+      } catch (error) {
+        console.error('Erro ao excluir membro:', error);
+        alert('Erro ao excluir membro. Tente novamente.');
+        await sendDiscordLog(
+          `❌ Erro ao excluir membro: ${error.message}`,
+          'error'
+        );
       }
-      // Envia notificação para Discord APENAS se for um novo membro (não edição)
-      if (!editingMembro) {
-        await sendDiscordNotification('hierarquia', membroData);
-      }
-
-      setModalOpen(false);
-      setEditingMembro(null);
-      setFormData({
-        nome: '',
-        patente: 'Tenente Coronel',
-        fotoURL: '',
-        ativo: true,
-        observacoes: '',
-      });
-    } catch (error) {
-      console.error('Erro ao salvar membro:', error);
-      alert('Erro ao salvar membro. Tente novamente.');
     }
   };
 
@@ -232,17 +238,6 @@ const Hierarquia = ({ isAdmin }) => {
       observacoes: membro.observacoes || '',
     });
     setModalOpen(true);
-  };
-
-  const handleDeleteMembro = async (id) => {
-    if (window.confirm('Tem certeza que deseja excluir este membro?')) {
-      try {
-        await deleteDoc(doc(db, 'hierarquia', id));
-      } catch (error) {
-        console.error('Erro ao excluir membro:', error);
-        alert('Erro ao excluir membro. Tente novamente.');
-      }
-    }
   };
 
   const handleViewMembro = (membro) => {
