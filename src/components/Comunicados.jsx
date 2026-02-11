@@ -30,6 +30,7 @@ import {
   Link as LinkIcon,
 } from 'lucide-react';
 import { formatContent } from './utils/markdownFormatter';
+import { sendDiscordNotification } from '../utils/discordWebhooks';
 
 const Comunicados = ({ isAdmin }) => {
   const [comunicados, setComunicados] = useState([]);
@@ -77,7 +78,7 @@ const Comunicados = ({ isAdmin }) => {
 
     window.addEventListener('keydown', handleEsc);
     return () => window.removeEventListener('keydown', handleEsc);
-}, [isModalOpen]);
+  }, [isModalOpen]);
 
   const toggleComExpand = (id) => {
     setExpandedComId(expandedComId === id ? null : id);
@@ -102,6 +103,13 @@ const Comunicados = ({ isAdmin }) => {
       } else {
         await addDoc(collection(db, 'comunicados'), comunicadoData);
       }
+
+      // ⭐⭐ ADICIONE ESTA LINHA ⭐⭐
+      // Envia notificação para Discord APENAS se for um novo comunicado (não edição)
+      if (!editingCom) {
+        await sendDiscordNotification('comunicados', comunicadoData);
+      }
+
       setModalOpen(false);
       setEditingCom(null);
       setFormData({ titulo: '', tipo: 'INFORMATIVO', conteudo: '' });
@@ -231,14 +239,11 @@ const Comunicados = ({ isAdmin }) => {
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-3">
                     <div
-                      className={`
-                      px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1
-                      ${
+                      className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 ${
                         com.tipo === 'INFORMATIVO'
                           ? 'bg-blue-500/20 text-blue-400'
                           : 'bg-yellow-500/20 text-yellow-400'
-                      }
-                    `}
+                      }`}
                     >
                       {com.tipo === 'INFORMATIVO' ? (
                         <Info size={12} />
