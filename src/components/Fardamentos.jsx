@@ -11,7 +11,7 @@ import {
   getDoc,
 } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
-import { Shirt, Plus, Edit, Trash2, ChevronRight, Save, X } from 'lucide-react';
+import { Shirt, Plus, Edit, Trash2, ChevronRight, Save, X, Layers, Calendar, ImageOff } from 'lucide-react';
 import { getFardaColor } from './utils/fardaColors';
 import '../styles/fardamentos.css';
 import {
@@ -19,48 +19,39 @@ import {
   deleteDiscordMessage,
 } from '../utils/discordManager';
 
-// Componente para exibir a foto (responsivo)
+// Componente de imagem com fallback elegante
 const FardaImage = ({ farda, size = 'medium' }) => {
   const colors = getFardaColor(farda.nome);
 
   const sizeClasses = {
-    small: 'w-20 h-20 sm:w-24 sm:h-24',
-    medium: 'w-28 h-28 sm:w-32 sm:h-32 md:w-40 md:h-40',
-    large: 'w-36 h-36 sm:w-44 sm:h-44 md:w-56 md:h-56',
+    small: 'w-16 h-16 sm:w-20 sm:h-20',
+    medium: 'w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32',
+    large: 'w-32 h-32 sm:w-36 sm:h-36 md:w-44 md:h-44',
   };
 
   return (
     <div
-      className={`${sizeClasses[size]} flex-shrink-0 rounded-xl bg-transparent flex items-center justify-center relative`}
+      className={`${sizeClasses[size]} flex-shrink-0 rounded-xl bg-gradient-to-br from-gray-800/50 to-gray-900/50 flex items-center justify-center relative overflow-hidden border border-gray-700/50 shadow-md`}
     >
       {farda.fotoURL ? (
         <img
           src={farda.fotoURL}
           alt={farda.nome}
-          className="w-full h-full object-contain rounded-xl transition-transform duration-300 hover:scale-105"
+          className="w-full h-full object-contain transition-transform duration-300 hover:scale-110"
           onError={(e) => {
-            e.target.style.display = 'none';
-            const parent = e.target.parentElement;
-            if (parent) {
-              parent.innerHTML = `
-                <div class="w-full h-full flex items-center justify-center bg-gray-800/50 rounded-xl">
-                  <div class="text-center">
-                    <svg class="w-8 h-8 sm:w-10 sm:h-10 text-white/60 mx-auto" ...></svg>
-                    <div class="text-white/50 text-xs sm:text-sm mt-1 font-semibold">${farda.nome.split(' ')[0]}</div>
-                  </div>
-                </div>
-              `;
-            }
+            e.target.onerror = null;
+            e.target.src = '';
+            e.target.alt = 'Erro';
+            e.target.parentElement.innerHTML = `
+              <div class="w-full h-full flex items-center justify-center">
+                <ImageOff size=${size === 'large' ? 36 : 24} class="text-gray-500" />
+              </div>
+            `;
           }}
         />
       ) : (
-        <div className="w-full h-full flex items-center justify-center bg-gray-800/30 rounded-xl">
-          <div className="text-center">
-            <Shirt size={size === 'large' ? 52 : size === 'medium' ? 36 : 28} className="text-white/60 mx-auto" />
-            <div className="text-white/50 text-xs sm:text-sm mt-1 font-semibold">
-              {farda.nome.split(' ')[0]}
-            </div>
-          </div>
+        <div className="w-full h-full flex items-center justify-center">
+          <Shirt size={size === 'large' ? 44 : size === 'medium' ? 32 : 24} className="text-gray-500" />
         </div>
       )}
     </div>
@@ -79,12 +70,9 @@ const Fardamentos = ({ isAdmin }) => {
     pecas: [{ tipo: '', numero: '', textura: '', descricao: '' }],
   });
 
-  // Buscar fardamentos em tempo real
+  // Buscar dados em tempo real
   useEffect(() => {
-    const q = query(
-      collection(db, 'fardamentos'),
-      orderBy('createdAt', 'desc')
-    );
+    const q = query(collection(db, 'fardamentos'), orderBy('createdAt', 'desc'));
     return onSnapshot(q, (snap) => {
       setFardamentos(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
@@ -108,7 +96,7 @@ const Fardamentos = ({ isAdmin }) => {
     return () => window.removeEventListener('keydown', handleEsc);
   }, [isModalOpen]);
 
-  // ========== SALVAR (CRIAÇÃO/EDIÇÃO) ==========
+  // ========== SALVAR ==========
   const handleSaveFarda = async () => {
     if (!formData.nome) {
       alert('Preencha o nome do fardamento!');
@@ -142,23 +130,18 @@ const Fardamentos = ({ isAdmin }) => {
       let discordMessageId = null;
 
       if (editingFarda) {
-        // EDIÇÃO: só Firebase
         await updateDoc(doc(db, 'fardamentos', editingFarda.id), fardaData);
       } else {
-        // CRIAÇÃO: Firebase + Discord
         const docRef = await addDoc(collection(db, 'fardamentos'), fardaData);
         discordMessageId = await upsertDiscordMessage('fardamentos', docRef.id, {
           ...fardaData,
           id: docRef.id,
         });
         if (discordMessageId) {
-          await updateDoc(doc(db, 'fardamentos', docRef.id), {
-            discordMessageId,
-          });
+          await updateDoc(doc(db, 'fardamentos', docRef.id), { discordMessageId });
         }
       }
 
-      // Fechar modal e resetar form
       setModalOpen(false);
       setEditingFarda(null);
       setFormData({
@@ -183,7 +166,6 @@ const Fardamentos = ({ isAdmin }) => {
         const fardaData = fardaDoc.data();
         if (!fardaData) throw new Error('Fardamento não encontrado');
 
-        // Remover do Discord
         if (fardaData?.discordMessageId) {
           await deleteDiscordMessage('fardamentos', {
             ...fardaData,
@@ -192,9 +174,7 @@ const Fardamentos = ({ isAdmin }) => {
           });
         }
 
-        // Remover do Firebase
         await deleteDoc(doc(db, 'fardamentos', id));
-
         setFardamentos((prev) => prev.filter((f) => f.id !== id));
         if (selectedFarda?.id === id) setSelectedFarda(null);
 
@@ -223,10 +203,7 @@ const Fardamentos = ({ isAdmin }) => {
           let textura = '';
           let descricao = parts.slice(1).join(' | ') || '';
 
-          if (
-            tipoNumero.toLowerCase().includes('máscara') ||
-            tipoNumero.toLowerCase().includes('mascara')
-          ) {
+          if (tipoNumero.toLowerCase().includes('máscara') || tipoNumero.toLowerCase().includes('mascara')) {
             tipo = 'mascara';
             numero = tipoNumero.replace(/[^\d]/g, '');
           } else if (tipoNumero.toLowerCase().includes('jaqueta')) {
@@ -235,10 +212,7 @@ const Fardamentos = ({ isAdmin }) => {
           } else if (tipoNumero.toLowerCase().includes('camisa')) {
             tipo = 'camisa';
             numero = tipoNumero.replace(/[^\d]/g, '');
-          } else if (
-            tipoNumero.toLowerCase().includes('calça') ||
-            tipoNumero.toLowerCase().includes('calca')
-          ) {
+          } else if (tipoNumero.toLowerCase().includes('calça') || tipoNumero.toLowerCase().includes('calca')) {
             tipo = 'calca';
             numero = tipoNumero.replace(/[^\d]/g, '');
           } else if (tipoNumero.toLowerCase().includes('colete')) {
@@ -267,11 +241,8 @@ const Fardamentos = ({ isAdmin }) => {
             numero = tipoNumero;
           }
 
-          const texturaMatch =
-            pecaStr.match(/txt\s*(\d+)/i) || pecaStr.match(/textura\s*(\d+)/i);
-          if (texturaMatch) {
-            textura = texturaMatch[1];
-          }
+          const texturaMatch = pecaStr.match(/txt\s*(\d+)/i) || pecaStr.match(/textura\s*(\d+)/i);
+          if (texturaMatch) textura = texturaMatch[1];
 
           return { tipo, numero, textura, descricao };
         });
@@ -282,26 +253,22 @@ const Fardamentos = ({ isAdmin }) => {
       nome: farda.nome,
       descricao: farda.descricao || '',
       fotoURL: farda.fotoURL || '',
-      pecas: pecasFormatadas.length > 0
-        ? pecasFormatadas
-        : [{ tipo: '', numero: '', textura: '', descricao: '' }],
+      pecas: pecasFormatadas.length > 0 ? pecasFormatadas : [{ tipo: '', numero: '', textura: '', descricao: '' }],
     });
     setModalOpen(true);
   };
 
-  // ========== SELECIONAR FARDAMENTO ==========
-  const handleViewFarda = (farda) => {
-    setSelectedFarda(farda);
-  };
+  // ========== SELECIONAR ==========
+  const handleViewFarda = (farda) => setSelectedFarda(farda);
 
   return (
     <div className="fade-in w-full max-w-full overflow-x-hidden">
-      {/* Cabeçalho responsivo */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+      {/* ===== HEADER ===== */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 lg:mb-8">
         <div>
-          <h2 className="text-xl sm:text-2xl font-bold flex items-center gap-2 sm:gap-3">
-            <Shirt size={24} className="sm:w-7 sm:h-7 text-blue-400" />
-            Fardamentos Operacionais
+          <h2 className="text-xl lg:text-2xl font-bold flex items-center gap-2 lg:gap-3">
+            <Shirt size={28} className="text-blue-400" />
+            <span>Fardamentos Operacionais</span>
           </h2>
           <p className="text-gray-400 text-xs sm:text-sm mt-1">
             Catálogo completo de uniformes da Força Tática PMESP
@@ -310,138 +277,136 @@ const Fardamentos = ({ isAdmin }) => {
         {isAdmin && (
           <button
             onClick={() => setModalOpen(true)}
-            className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-4 py-2 sm:px-5 sm:py-2.5 rounded-lg font-semibold flex items-center justify-center gap-2 transition-all hover:scale-105 shadow-lg shadow-blue-500/20 text-sm sm:text-base"
+            className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-5 py-2.5 rounded-lg font-semibold flex items-center justify-center gap-2 transition-all hover:scale-105 shadow-lg shadow-blue-500/20 text-sm lg:text-base"
           >
             <Plus size={18} /> Novo Fardamento
           </button>
         )}
       </div>
 
-      {/* Layout principal: empilha no mobile, lado a lado no desktop */}
-      <div className="flex flex-col lg:flex-row gap-6 lg:gap-12">
-
-        {/* Catálogo de Fardamentos - Lado Esquerdo */}
-        <div className="w-full lg:w-7/12">
-          <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/30 border border-blue-500/20 rounded-xl p-4 sm:p-6 lg:p-8 flex flex-col w-full">
-            <div className="flex justify-between items-center mb-4 sm:mb-6">
-              <h3 className="font-bold text-base sm:text-lg flex items-center gap-2">
-                <div className="p-1.5 sm:p-2 rounded-lg bg-blue-500/20 border border-blue-500/30">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400"
-                  >
-                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-                    <path d="M9 12h6" />
-                    <path d="M12 9v6" />
-                  </svg>
+      {/* ===== LAYOUT PRINCIPAL ===== */}
+      <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 xl:gap-10">
+        
+        {/* === COLUNA ESQUERDA - CATÁLOGO === */}
+        <div className="w-full lg:w-7/12 xl:w-8/12">
+          <div className="bg-gradient-to-br from-gray-800/40 to-gray-900/40 backdrop-blur-sm border border-blue-500/20 rounded-2xl p-4 lg:p-5 xl:p-6 flex flex-col w-full h-full shadow-xl">
+            
+            {/* Título da seção */}
+            <div className="flex justify-between items-center mb-4 lg:mb-5">
+              <h3 className="font-semibold text-base lg:text-lg flex items-center gap-2">
+                <div className="p-1.5 lg:p-2 rounded-lg bg-blue-500/20 border border-blue-500/30">
+                  <Layers size={18} className="lg:w-5 lg:h-5 text-blue-400" />
                 </div>
                 <span className="text-white">Catálogo de Fardamentos</span>
               </h3>
+              <span className="text-xs text-gray-500 bg-gray-800/50 px-3 py-1 rounded-full">
+                {fardamentos.length} {fardamentos.length === 1 ? 'item' : 'itens'}
+              </span>
             </div>
 
-            {/* Lista de fardamentos */}
+            {/* Lista de fardamentos - SCROLL OTIMIZADO */}
             <div className="flex-1 overflow-hidden">
               {fardamentos.length === 0 ? (
-                <div className="text-center py-8 sm:py-12">
-                  <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-4 rounded-xl bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 flex items-center justify-center">
-                    <Shirt size={32} className="sm:w-10 sm:h-10 text-gray-600" />
+                <div className="text-center py-12 lg:py-16">
+                  <div className="w-20 h-20 lg:w-24 lg:h-24 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 flex items-center justify-center">
+                    <Shirt size={40} className="lg:w-12 lg:h-12 text-gray-600" />
                   </div>
-                  <p className="text-gray-400 text-base sm:text-lg">Nenhum fardamento cadastrado</p>
+                  <p className="text-gray-400 text-base lg:text-lg">Nenhum fardamento cadastrado</p>
                   {isAdmin && (
-                    <p className="text-xs sm:text-sm text-gray-500 mt-2">
-                      Clique em "Novo Fardamento" para adicionar o primeiro
+                    <p className="text-xs lg:text-sm text-gray-500 mt-2">
+                      Clique em "Novo Fardamento" para adicionar
                     </p>
                   )}
                 </div>
               ) : (
-                <div className="space-y-4 sm:space-y-6 max-h-[calc(100vh-300px)] lg:max-h-[calc(100vh-200px)] overflow-y-auto pr-2 sm:pr-4">
+                <div className="space-y-3 lg:space-y-2 max-h-[calc(100vh-280px)] lg:max-h-[calc(100vh-240px)] overflow-y-auto pr-2 lg:pr-3 scroll-smooth">
                   {fardamentos.map((farda) => {
                     const colors = getFardaColor(farda.nome);
+                    const isSelected = selectedFarda?.id === farda.id;
                     return (
                       <div
                         key={farda.id}
-                        className={`flex items-start sm:items-center p-4 sm:p-6 rounded-xl cursor-pointer transition-all duration-300 ${
-                          selectedFarda?.id === farda.id
-                            ? `${colors.bg} border-2 ${colors.borderStrong} shadow-lg shadow-blue-500/10`
-                            : 'bg-gray-900/30 hover:bg-gray-800/50 border border-gray-700/30'
-                        } group hover:border-blue-500/30`}
+                        className={`
+                          group relative flex items-start lg:items-center p-3 lg:p-4 rounded-xl cursor-pointer 
+                          transition-all duration-200 border
+                          ${isSelected 
+                            ? `${colors.bg} border-2 ${colors.borderStrong} shadow-lg shadow-blue-500/20 scale-[1.02]` 
+                            : 'bg-gray-900/30 hover:bg-gray-800/60 border border-gray-700/50 hover:border-blue-500/30 hover:shadow-md'
+                          }
+                        `}
                         onClick={() => handleViewFarda(farda)}
                       >
-                        <div className="flex-shrink-0 mr-3 sm:mr-6">
-                          <FardaImage farda={farda} size="medium" />
+                        {/* Imagem */}
+                        <div className="flex-shrink-0 mr-3 lg:mr-4">
+                          <FardaImage farda={farda} size="small" />
                         </div>
 
+                        {/* Conteúdo */}
                         <div className="flex-1 min-w-0">
-                          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
+                          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1 sm:gap-2">
                             <div className="flex-1">
-                              <div className="flex flex-wrap items-center gap-2 mb-1">
-                                <h4 className="font-bold text-base sm:text-lg text-white group-hover:text-blue-300 transition-colors truncate">
+                              <div className="flex flex-wrap items-center gap-2 mb-0.5">
+                                <h4 className={`font-bold text-sm lg:text-base truncate ${isSelected ? 'text-white' : 'text-white group-hover:text-blue-300'}`}>
                                   {farda.nome}
                                 </h4>
-                                <span
-                                  className={`px-2 py-0.5 sm:px-3 sm:py-1 rounded-full text-xs ${colors.badge} border ${colors.border}`}
-                                >
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] lg:text-xs font-medium ${colors.badge} border ${colors.border}`}>
                                   {farda.pecas?.length || 0} peças
                                 </span>
                               </div>
 
                               {farda.descricao && (
-                                <p className="text-xs sm:text-sm text-gray-400 mb-2 line-clamp-2">
+                                <p className="text-xs lg:text-sm text-gray-400 line-clamp-1 lg:line-clamp-2">
                                   {farda.descricao}
                                 </p>
                               )}
 
                               {farda.pecas && farda.pecas.length > 0 && (
-                                <div className="flex items-center gap-1 sm:gap-2 mt-1 flex-wrap">
-                                  {farda.pecas.slice(0, 3).map((peca, idx) => {
-                                    let displayText = '';
+                                <div className="flex items-center gap-1 lg:gap-1.5 mt-1.5 flex-wrap">
+                                  {farda.pecas.slice(0, 4).map((peca, idx) => {
+                                    let display = '';
                                     if (typeof peca === 'string') {
-                                      displayText = peca.length > 10 ? peca.substring(0, 10) + '...' : peca;
+                                      display = peca.split('|')[0].trim();
                                     } else {
-                                      displayText = `${peca.tipo?.toUpperCase() || ''} ${peca.numero || ''}`.trim();
-                                      if (displayText.length > 10) displayText = displayText.substring(0, 10) + '...';
+                                      display = `${peca.tipo?.toUpperCase() || ''} ${peca.numero || ''}`.trim();
                                     }
+                                    if (display.length > 8) display = display.slice(0, 8) + '…';
                                     return (
                                       <span
                                         key={idx}
-                                        className="text-xs px-2 py-0.5 sm:px-3 sm:py-1 bg-gray-800/50 rounded-full text-gray-300 border border-gray-700/50"
+                                        className="text-[10px] lg:text-xs px-2 py-0.5 bg-gray-800/80 rounded-full text-gray-300 border border-gray-700/80"
                                       >
-                                        {displayText}
+                                        {display}
                                       </span>
                                     );
                                   })}
-                                  {farda.pecas.length > 3 && (
-                                    <span className="text-xs px-2 py-0.5 bg-gray-800/50 rounded-lg text-gray-500">
-                                      +{farda.pecas.length - 3}
+                                  {farda.pecas.length > 4 && (
+                                    <span className="text-[10px] lg:text-xs px-2 py-0.5 bg-gray-800/80 rounded-lg text-gray-500">
+                                      +{farda.pecas.length - 4}
                                     </span>
                                   )}
                                 </div>
                               )}
                             </div>
 
-                            <div className="flex items-center gap-2 self-end sm:self-start">
-                              <div className="text-right hidden sm:block">
-                                <div className="text-xs text-gray-500">Criado em</div>
-                                <div className="text-sm text-gray-400">
-                                  {farda.createdAt?.toDate
-                                    ? new Date(farda.createdAt.toDate()).toLocaleDateString('pt-BR')
-                                    : farda.createdAt
-                                    ? new Date(farda.createdAt).toLocaleDateString('pt-BR')
-                                    : 'N/A'}
-                                </div>
-                              </div>
-                              <ChevronRight size={18} className="text-gray-500 group-hover:text-blue-400 transition-colors" />
+                            {/* Data (desktop) */}
+                            <div className="hidden lg:flex items-center gap-1 text-xs text-gray-500">
+                              <Calendar size={12} />
+                              <span>
+                                {farda.createdAt?.toDate
+                                  ? new Date(farda.createdAt.toDate()).toLocaleDateString('pt-BR')
+                                  : farda.createdAt
+                                  ? new Date(farda.createdAt).toLocaleDateString('pt-BR')
+                                  : 'N/A'}
+                              </span>
                             </div>
+                            <ChevronRight size={16} className="text-gray-500 group-hover:text-blue-400 transition-colors lg:hidden" />
                           </div>
                         </div>
+
+                        {/* Indicador de seleção (desktop) */}
+                        {isSelected && (
+                          <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-1 h-8 bg-blue-500 rounded-full shadow-lg shadow-blue-500/50 hidden lg:block"></div>
+                        )}
                       </div>
                     );
                   })}
@@ -451,165 +416,111 @@ const Fardamentos = ({ isAdmin }) => {
           </div>
         </div>
 
-        {/* Composição do Fardamento - Lado Direito */}
-        <div className="w-full lg:w-5/12">
-          <div className="bg-gradient-to-b from-gray-800/50 to-gray-900/30 border border-blue-500/20 rounded-xl p-4 sm:p-6 lg:p-8 flex flex-col w-full min-h-[400px] lg:min-h-[650px]">
+        {/* === COLUNA DIREITA - COMPOSIÇÃO === */}
+        <div className="w-full lg:w-5/12 xl:w-4/12">
+          <div className="bg-gradient-to-b from-gray-800/40 to-gray-900/40 backdrop-blur-sm border border-blue-500/20 rounded-2xl p-5 lg:p-6 xl:p-7 flex flex-col w-full h-full shadow-xl min-h-[400px] lg:min-h-[600px]">
             {selectedFarda ? (
               <>
-                <div className="text-center mb-4 sm:mb-6">
-                  <div className="relative mx-auto mb-3 sm:mb-4">
+                {/* Header da composição */}
+                <div className="text-center mb-5 lg:mb-6">
+                  <div className="relative inline-block mx-auto mb-4">
                     <FardaImage farda={selectedFarda} size="large" />
                     <div
-                      className={`absolute -bottom-2 -right-2 px-3 py-1 rounded-full text-xs font-bold ${
-                        getFardaColor(selectedFarda.nome).badge
-                      } border ${getFardaColor(selectedFarda.nome).border}`}
+                      className={`absolute -bottom-2 -right-2 px-3 py-1 rounded-full text-[10px] lg:text-xs font-bold ${getFardaColor(selectedFarda.nome).badge} border ${getFardaColor(selectedFarda.nome).border} shadow-md`}
                     >
                       {selectedFarda.pecas?.length || 0} ITENS
                     </div>
                   </div>
-                  <h3 className="text-lg sm:text-xl font-bold text-white mb-2">{selectedFarda.nome}</h3>
+                  <h3 className="text-lg lg:text-xl font-bold text-white mb-2">{selectedFarda.nome}</h3>
                   {selectedFarda.descricao && (
-                    <div className="bg-gray-900/40 rounded-lg p-2 sm:p-3 mb-3">
-                      <p className="text-xs sm:text-sm text-gray-300">{selectedFarda.descricao}</p>
+                    <div className="bg-gray-900/60 rounded-lg p-3 mb-2 text-sm lg:text-base text-gray-300 border border-gray-700/50">
+                      {selectedFarda.descricao}
                     </div>
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 sm:gap-3 mb-4 sm:mb-6">
-                  <div className="bg-gray-900/30 rounded-lg p-2 sm:p-3 text-center">
-                    <div className="text-lg sm:text-xl font-bold text-blue-400">
-                      {selectedFarda.pecas?.length || 0}
-                    </div>
-                    <div className="text-xs text-gray-400 mt-1">Peças</div>
+                {/* Métricas */}
+                <div className="grid grid-cols-2 gap-3 lg:gap-4 mb-5 lg:mb-6">
+                  <div className="bg-gray-900/50 rounded-xl p-3 lg:p-4 text-center border border-gray-700/50">
+                    <div className="text-xl lg:text-2xl font-bold text-blue-400">{selectedFarda.pecas?.length || 0}</div>
+                    <div className="text-xs lg:text-sm text-gray-400 mt-1">Peças</div>
                   </div>
-                  <div className="bg-gray-900/30 rounded-lg p-2 sm:p-3 text-center">
-                    <div className="text-lg sm:text-xl font-bold text-green-400">
+                  <div className="bg-gray-900/50 rounded-xl p-3 lg:p-4 text-center border border-gray-700/50">
+                    <div className="text-xl lg:text-2xl font-bold text-green-400">
                       {selectedFarda.createdAt?.toDate
-                        ? new Date(selectedFarda.createdAt.toDate()).toLocaleDateString('pt-BR')
+                        ? new Date(selectedFarda.createdAt.toDate()).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
                         : selectedFarda.createdAt
-                        ? new Date(selectedFarda.createdAt).toLocaleDateString('pt-BR')
+                        ? new Date(selectedFarda.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
                         : 'N/A'}
                     </div>
-                    <div className="text-xs text-gray-400 mt-1">Cadastro</div>
+                    <div className="text-xs lg:text-sm text-gray-400 mt-1">Cadastro</div>
                   </div>
                 </div>
 
+                {/* Lista de peças - SCROLL SUAVE */}
                 <div className="flex-1 flex flex-col overflow-hidden">
-                  <h4 className="font-semibold text-gray-300 mb-3 flex items-center gap-2 text-base sm:text-lg border-b border-gray-700 pb-2">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="w-5 h-5 text-blue-400"
-                    >
-                      <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-                      <polyline points="14 2 14 8 20 8" />
-                      <path d="M16 13H8" />
-                      <path d="M16 17H8" />
-                      <path d="M10 9H8" />
-                    </svg>
+                  <h4 className="font-semibold text-gray-300 mb-3 flex items-center gap-2 text-sm lg:text-base border-b border-gray-700/80 pb-2">
+                    <Layers size={18} className="text-blue-400" />
                     COMPOSIÇÃO
                   </h4>
-                  <div className="flex-1 overflow-y-auto pr-1 sm:pr-2 space-y-3 sm:space-y-4">
+                  <div className="flex-1 overflow-y-auto pr-1 space-y-3 scroll-smooth">
                     {selectedFarda.pecas && selectedFarda.pecas.length > 0 ? (
-                      selectedFarda.pecas.map((peca, index) => {
-                        if (typeof peca === 'string') {
-                          const partes = peca.split('|').map((p) => p.trim());
-                          const nomePeca = partes[0] || '';
-                          const detalhes = partes.slice(1).join(' | ');
-                          return (
+                      selectedFarda.pecas.map((peca, index) => (
+                        <div
+                          key={index}
+                          className="bg-gray-900/60 rounded-xl p-3 lg:p-4 hover:bg-gray-800/70 transition-all border border-gray-700/50 hover:border-blue-500/30 hover:shadow-md"
+                        >
+                          <div className="flex items-start gap-3">
                             <div
-                              key={index}
-                              className="bg-gray-900/40 rounded-lg p-3 sm:p-4 hover:bg-gray-800/60 transition-all border border-gray-700/30 hover:border-blue-500/30"
+                              className={`w-8 h-8 lg:w-10 lg:h-10 rounded-lg ${getFardaColor(selectedFarda.nome).bg} border ${getFardaColor(selectedFarda.nome).border} flex items-center justify-center flex-shrink-0 shadow-sm`}
                             >
-                              <div className="flex items-center gap-3 mb-2">
-                                <div
-                                  className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg ${
-                                    getFardaColor(selectedFarda.nome).bg
-                                  } border ${getFardaColor(selectedFarda.nome).border} flex items-center justify-center flex-shrink-0`}
-                                >
-                                  <span className="text-sm sm:text-base font-bold text-white">{index + 1}</span>
-                                </div>
-                                <div className="flex-1">
-                                  <h5 className="font-semibold text-white text-sm sm:text-base">{nomePeca}</h5>
-                                </div>
-                              </div>
-                              {detalhes && (
-                                <div className="pl-11 sm:pl-14">
-                                  <div className="text-xs sm:text-sm text-gray-300 bg-gray-800/50 rounded-lg p-2 sm:p-3 border-l-2 border-blue-500/50">
-                                    {detalhes.split('|').map((item, i) => (
-                                      <div key={i} className="mb-1 last:mb-0">{item.trim()}</div>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
+                              <span className="text-sm lg:text-base font-bold text-white">{index + 1}</span>
                             </div>
-                          );
-                        } else {
-                          const tipoFormatado = peca.tipo ? peca.tipo.toUpperCase() : '';
-                          const numero = peca.numero || '';
-                          const textura = peca.textura ? ` | TXT ${peca.textura}` : '';
-                          const descricao = peca.descricao || '';
-                          return (
-                            <div
-                              key={index}
-                              className="bg-gray-900/40 rounded-lg p-3 sm:p-4 hover:bg-gray-800/60 transition-all border border-gray-700/30 hover:border-blue-500/30"
-                            >
-                              <div className="flex items-center gap-3 mb-2">
-                                <div
-                                  className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg ${
-                                    getFardaColor(selectedFarda.nome).bg
-                                  } border ${getFardaColor(selectedFarda.nome).border} flex items-center justify-center flex-shrink-0`}
-                                >
-                                  <span className="text-sm sm:text-base font-bold text-white">{index + 1}</span>
-                                </div>
-                                <div className="flex-1">
-                                  <h5 className="font-semibold text-white text-sm sm:text-base">
-                                    {tipoFormatado} {numero}
-                                    {textura}
-                                  </h5>
-                                </div>
-                              </div>
-                              {descricao && (
-                                <div className="pl-11 sm:pl-14">
-                                  <div className="text-xs sm:text-sm text-gray-300 bg-gray-800/50 rounded-lg p-2 sm:p-3 border-l-2 border-blue-500/50">
-                                    {descricao}
-                                  </div>
-                                </div>
-                              )}
+                            <div className="flex-1">
+                              <h5 className="font-semibold text-white text-sm lg:text-base">
+                                {typeof peca === 'string'
+                                  ? peca.split('|')[0].trim()
+                                  : `${peca.tipo?.toUpperCase() || ''} ${peca.numero || ''}${peca.textura ? ` · TXT ${peca.textura}` : ''}`}
+                              </h5>
+                              {typeof peca === 'string'
+                                ? peca.split('|').slice(1).join(' | ') && (
+                                    <p className="text-xs lg:text-sm text-gray-400 mt-1 line-clamp-2">
+                                      {peca.split('|').slice(1).join(' | ').trim()}
+                                    </p>
+                                  )
+                                : peca.descricao && (
+                                    <p className="text-xs lg:text-sm text-gray-400 mt-1 line-clamp-2">
+                                      {peca.descricao}
+                                    </p>
+                                  )}
                             </div>
-                          );
-                        }
-                      })
+                          </div>
+                        </div>
+                      ))
                     ) : (
-                      <div className="text-center py-8 border-2 border-dashed border-gray-700 rounded-lg">
-                        <Shirt size={40} className="mx-auto text-gray-600 mb-2" />
+                      <div className="text-center py-10 border-2 border-dashed border-gray-700 rounded-xl">
+                        <Layers size={40} className="mx-auto text-gray-600 mb-2" />
                         <p className="text-gray-400 text-sm">Nenhuma peça cadastrada</p>
                         {isAdmin && (
-                          <p className="text-xs text-gray-500 mt-1">Edite para adicionar peças</p>
+                          <p className="text-xs text-gray-500 mt-2">Edite para adicionar peças</p>
                         )}
                       </div>
                     )}
                   </div>
                 </div>
 
+                {/* Botões admin */}
                 {isAdmin && (
-                  <div className="flex gap-2 sm:gap-3 pt-4 border-t border-gray-700 mt-4">
+                  <div className="flex gap-3 lg:gap-4 pt-4 lg:pt-5 border-t border-gray-700/80 mt-4 lg:mt-5">
                     <button
                       onClick={() => handleEditFarda(selectedFarda)}
-                      className="flex-1 bg-gradient-to-r from-yellow-600/20 to-yellow-700/10 hover:from-yellow-600/30 hover:to-yellow-700/20 text-yellow-400 py-2 sm:py-3 rounded-lg font-medium flex items-center justify-center gap-2 transition-all border border-yellow-500/30 hover:border-yellow-500/50 text-sm sm:text-base"
+                      className="flex-1 bg-gradient-to-r from-yellow-600/20 to-yellow-700/10 hover:from-yellow-600/30 hover:to-yellow-700/20 text-yellow-400 py-2.5 lg:py-3 rounded-lg font-medium flex items-center justify-center gap-2 transition-all border border-yellow-500/30 hover:border-yellow-500/50 text-sm lg:text-base"
                     >
                       <Edit size={16} /> Editar
                     </button>
                     <button
                       onClick={() => handleDeleteFarda(selectedFarda.id)}
-                      className="flex-1 bg-gradient-to-r from-red-600/20 to-red-700/10 hover:from-red-600/30 hover:to-red-700/20 text-red-400 py-2 sm:py-3 rounded-lg font-medium flex items-center justify-center gap-2 transition-all border border-red-500/30 hover:border-red-500/50 text-sm sm:text-base"
+                      className="flex-1 bg-gradient-to-r from-red-600/20 to-red-700/10 hover:from-red-600/30 hover:to-red-700/20 text-red-400 py-2.5 lg:py-3 rounded-lg font-medium flex items-center justify-center gap-2 transition-all border border-red-500/30 hover:border-red-500/50 text-sm lg:text-base"
                     >
                       <Trash2 size={16} /> Excluir
                     </button>
@@ -617,14 +528,19 @@ const Fardamentos = ({ isAdmin }) => {
                 )}
               </>
             ) : (
-              <div className="text-center py-8 sm:py-12">
-                <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-4 rounded-xl bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 flex items-center justify-center">
-                  <Shirt size={32} className="sm:w-10 sm:h-10 text-gray-600" />
+              /* Placeholder elegante quando nada selecionado */
+              <div className="flex flex-col items-center justify-center h-full min-h-[400px] lg:min-h-[500px] text-center">
+                <div className="w-24 h-24 lg:w-32 lg:h-32 mb-6 rounded-3xl bg-gradient-to-br from-gray-800/50 to-gray-900/50 border-2 border-dashed border-gray-700 flex items-center justify-center">
+                  <Shirt size={48} className="lg:w-16 lg:h-16 text-gray-600" />
                 </div>
-                <p className="text-gray-400 text-base sm:text-lg">Selecione um fardamento</p>
-                <p className="text-xs sm:text-sm text-gray-500 mt-2">
-                  Clique em um item da lista para ver os detalhes completos
+                <h3 className="text-lg lg:text-xl font-bold text-gray-300 mb-2">Nenhum fardamento selecionado</h3>
+                <p className="text-sm lg:text-base text-gray-500 max-w-xs">
+                  Clique em um item do catálogo ao lado para visualizar sua composição completa.
                 </p>
+                <div className="mt-6 flex items-center gap-2 text-xs text-gray-600">
+                  <Layers size={14} />
+                  <span>Catálogo com {fardamentos.length} {fardamentos.length === 1 ? 'fardamento' : 'fardamentos'}</span>
+                </div>
               </div>
             )}
           </div>
