@@ -8,12 +8,16 @@ import {
   onSnapshot,
   query,
   orderBy,
+  getDoc, // 👈 IMPORTANTE: Adicionar getDoc
 } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
 import { Shirt, Plus, Edit, Trash2, ChevronRight, Save, X } from 'lucide-react';
 import { getFardaColor } from './utils/fardaColors';
 import '../styles/fardamentos.css';
-import { sendDiscordNotification } from '../utils/discordWebhooks';
+import {
+  upsertDiscordMessage,
+  deleteDiscordMessage,
+} from '../utils/discordManager';
 
 // Componente para exibir a foto
 const FardaImage = ({ farda, size = 'medium' }) => {
@@ -99,11 +103,11 @@ const FardaImage = ({ farda, size = 'medium' }) => {
     </div>
   );
 };
+
 const Fardamentos = ({ isAdmin }) => {
   const [fardamentos, setFardamentos] = useState([]);
   const [selectedFarda, setSelectedFarda] = useState(null);
   const [isModalOpen, setModalOpen] = useState(false);
-  const [isViewModalOpen, setViewModalOpen] = useState(false);
   const [editingFarda, setEditingFarda] = useState(null);
   const [formData, setFormData] = useState({
     nome: '',
@@ -140,6 +144,7 @@ const Fardamentos = ({ isAdmin }) => {
     return () => window.removeEventListener('keydown', handleEsc);
   }, [isModalOpen]);
 
+  // ========== HANDLE SAVE - COMPLETAMENTE ATUALIZADO ==========
   const handleSaveFarda = async () => {
     if (!formData.nome) {
       alert('Preencha o nome do fardamento!');
@@ -165,21 +170,44 @@ const Fardamentos = ({ isAdmin }) => {
     const fardaData = {
       ...formData,
       pecas: pecasFiltradas,
-      createdAt: new Date(),
+      createdAt: editingFarda ? editingFarda.createdAt : new Date(),
+      updatedAt: new Date(),
       createdBy: auth.currentUser?.uid || '',
     };
 
     try {
+      let discordMessageId = null;
+
       if (editingFarda) {
+        // === EDIÇÃO: Atualizar fardamento existente ===
         await updateDoc(doc(db, 'fardamentos', editingFarda.id), fardaData);
+        
+        // 🔄 Sincronizar com Discord (ATUALIZA a mensagem existente)
+        discordMessageId = await upsertDiscordMessage('fardamentos', editingFarda.id, {
+          ...fardaData,
+          id: editingFarda.id,
+          discordMessageId: editingFarda.discordMessageId // Mantém o ID existente
+        });
+        
       } else {
-        await addDoc(collection(db, 'fardamentos'), fardaData);
-      }
-      // Envia notificação para Discord APENAS se for um novo fardamento (não edição)
-      if (!editingFarda) {
-        await sendDiscordNotification('fardamentos', fardaData);
+        // === CRIAÇÃO: Novo fardamento ===
+        const docRef = await addDoc(collection(db, 'fardamentos'), fardaData);
+        
+        // 🔄 Sincronizar com Discord (CRIA nova mensagem)
+        discordMessageId = await upsertDiscordMessage('fardamentos', docRef.id, {
+          ...fardaData,
+          id: docRef.id
+        });
+        
+        // 💾 SALVAR o ID da mensagem no Firebase!
+        if (discordMessageId) {
+          await updateDoc(doc(db, 'fardamentos', docRef.id), {
+            discordMessageId: discordMessageId
+          });
+        }
       }
 
+      // ✅ Limpar estado e fechar modal
       setModalOpen(false);
       setEditingFarda(null);
       setFormData({
@@ -188,9 +216,51 @@ const Fardamentos = ({ isAdmin }) => {
         fotoURL: '',
         pecas: [{ tipo: '', numero: '', textura: '', descricao: '' }],
       });
+
+      // 📋 Log de sucesso
+      console.log(`✅ Fardamento ${editingFarda ? 'atualizado' : 'criado'}: ${fardaData.nome}`);
+      
     } catch (error) {
       console.error('Erro ao salvar fardamento:', error);
       alert('Erro ao salvar fardamento. Tente novamente.');
+    }
+  };
+
+  // ========== HANDLE DELETE - COMPLETAMENTE ATUALIZADO ==========
+  const handleDeleteFarda = async (id) => {
+    if (window.confirm('Tem certeza que deseja excluir este fardamento?')) {
+      try {
+        // 🔍 Buscar dados do fardamento ANTES de deletar
+        const fardaDoc = await getDoc(doc(db, 'fardamentos', id));
+        const fardaData = fardaDoc.data();
+
+        if (!fardaData) {
+          throw new Error('Fardamento não encontrado');
+        }
+
+        // 🔄 Remover do Discord PRIMEIRO
+        if (fardaData?.discordMessageId) {
+          await deleteDiscordMessage('fardamentos', {
+            ...fardaData,
+            id: id,
+            discordMessageId: fardaData.discordMessageId
+          });
+        }
+
+        // 🗑️ Depois deletar do Firebase
+        await deleteDoc(doc(db, 'fardamentos', id));
+
+        // 🎯 Atualizar estado local
+        setFardamentos(prev => prev.filter(f => f.id !== id));
+        if (selectedFarda?.id === id) {
+          setSelectedFarda(null);
+        }
+
+        console.log(`🗑️ Fardamento removido: ${fardaData?.nome}`);
+      } catch (error) {
+        console.error('Erro ao excluir fardamento:', error);
+        alert('Erro ao excluir fardamento. Tente novamente.');
+      }
     }
   };
 
@@ -277,17 +347,6 @@ const Fardamentos = ({ isAdmin }) => {
           : [{ tipo: '', numero: '', textura: '', descricao: '' }],
     });
     setModalOpen(true);
-  };
-
-  const handleDeleteFarda = async (id) => {
-    if (window.confirm('Tem certeza que deseja excluir este fardamento?')) {
-      try {
-        await deleteDoc(doc(db, 'fardamentos', id));
-      } catch (error) {
-        console.error('Erro ao excluir fardamento:', error);
-        alert('Erro ao excluir fardamento. Tente novamente.');
-      }
-    }
   };
 
   const handleViewFarda = (farda) => {
@@ -468,6 +527,8 @@ const Fardamentos = ({ isAdmin }) => {
                                     ? new Date(
                                         farda.createdAt.toDate()
                                       ).toLocaleDateString('pt-BR')
+                                    : farda.createdAt
+                                    ? new Date(farda.createdAt).toLocaleDateString('pt-BR')
                                     : 'N/A'}
                                 </div>
                               </div>
@@ -543,6 +604,8 @@ const Fardamentos = ({ isAdmin }) => {
                         ? new Date(
                             selectedFarda.createdAt.toDate()
                           ).toLocaleDateString('pt-BR')
+                        : selectedFarda.createdAt
+                        ? new Date(selectedFarda.createdAt).toLocaleDateString('pt-BR')
                         : 'N/A'}
                     </div>
                     <div className="text-xs text-gray-400 mt-1">Cadastro</div>
