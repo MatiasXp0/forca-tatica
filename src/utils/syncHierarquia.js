@@ -1,51 +1,60 @@
 // src/utils/syncHierarquia.js
-import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
-import discordManager from './discordManager';
+import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { syncHierarquiaLista } from './discordManager';
 
-let unsubscribe = null;
+let intervaloId = null;
+let isSincronizando = false;
 
-export function iniciarSyncHierarquia() {
-  if (unsubscribe) {
-    console.log('🔄 Sync da hierarquia já está ativo');
-    return;
+const buscarMembros = async () => {
+  try {
+    const q = query(collection(db, 'hierarquia'), orderBy('patente'));
+    const snapshot = await getDocs(q);
+    
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+  } catch (error) {
+    console.error('❌ Erro ao buscar membros:', error);
+    return [];
   }
+};
 
-  console.log('🚀 Iniciando sincronização automática da hierarquia...');
+export const sincronizarHierarquia = async () => {
+  if (isSincronizando) return;
   
-  const q = query(collection(db, 'hierarquia'), orderBy('patente'));
+  isSincronizando = true;
   
-  unsubscribe = onSnapshot(q, async (snapshot) => {
-    try {
-      const membros = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-
-      if (membros.length > 0) {
-        await discordManager.syncHierarquiaLista(membros);
-      }
-    } catch (error) {
-      console.error('❌ Erro ao sincronizar hierarquia:', error);
+  try {
+    console.log('🔄 Sincronizando hierarquia...');
+    const membros = await buscarMembros();
+    
+    if (membros.length > 0) {
+      await syncHierarquiaLista(membros);
+      console.log(`✅ Hierarquia sincronizada: ${membros.length} membros`);
     }
-  }, (error) => {
-    console.error('❌ Erro no listener da hierarquia:', error);
-  });
-
-  console.log('✅ Sincronização automática da hierarquia ativada');
-}
-
-export function pararSyncHierarquia() {
-  if (unsubscribe) {
-    unsubscribe();
-    unsubscribe = null;
-    console.log('🛑 Sincronização da hierarquia parada');
+  } catch (error) {
+    console.error('❌ Erro na sincronização:', error);
+  } finally {
+    isSincronizando = false;
   }
-}
+};
 
-export function getSyncStatus() {
-  return {
-    ativo: unsubscribe !== null,
-    timestamp: new Date().toISOString()
-  };
-}
+export const iniciarSyncHierarquia = (intervaloMs = 30000) => {
+  if (intervaloId) return;
+  
+  console.log(`🚀 Iniciando sincronização automática (${intervaloMs/1000}s)...`);
+  sincronizarHierarquia();
+  intervaloId = setInterval(sincronizarHierarquia, intervaloMs);
+};
+
+export const pararSyncHierarquia = () => {
+  if (intervaloId) {
+    clearInterval(intervaloId);
+    intervaloId = null;
+    console.log('🛑 Sincronização parada');
+  }
+};
+
+export const sincronizarAgora = sincronizarHierarquia;
