@@ -31,9 +31,12 @@ import { getAdvertenciaColor } from './utils/fardaColors';
 import {
   upsertDiscordMessage,
   deleteDiscordMessage,
-  syncHierarquiaLista
+  syncHierarquiaLista,
 } from '../utils/discordManager';
-import { iniciarSyncHierarquia, pararSyncHierarquia } from '../utils/syncHierarquia';
+import {
+  iniciarSyncHierarquia,
+  pararSyncHierarquia,
+} from '../utils/syncHierarquia';
 
 const Hierarquia = ({ isAdmin }) => {
   const [membros, setMembros] = useState([]);
@@ -139,34 +142,14 @@ const Hierarquia = ({ isAdmin }) => {
     };
 
     try {
-      let discordMessageId = null;
-
       if (editingMembro) {
         await updateDoc(doc(db, 'hierarquia', editingMembro.id), membroData);
-
-        discordMessageId = await upsertDiscordMessage(
-          'hierarquia',
-          editingMembro.id,
-          {
-            ...membroData,
-            id: editingMembro.id,
-            discordMessageId: editingMembro.discordMessageId,
-          }
-        );
       } else {
-        const result = await addDoc(collection(db, 'hierarquia'), membroData);
-
-        discordMessageId = await upsertDiscordMessage('hierarquia', result.id, {
-          ...membroData,
-          id: result.id,
-        });
-
-        if (discordMessageId) {
-          await updateDoc(doc(db, 'hierarquia', result.id), {
-            discordMessageId: discordMessageId,
-          });
-        }
+        await addDoc(collection(db, 'hierarquia'), membroData);
       }
+
+      // ✅ NÃO CHAMAR upsertDiscordMessage AQUI!
+      // O sincronizador automático fará isso em 30 segundos
 
       setModalOpen(false);
       setEditingMembro(null);
@@ -178,7 +161,11 @@ const Hierarquia = ({ isAdmin }) => {
         observacoes: '',
       });
 
-      console.log(`✅ Membro ${editingMembro ? 'atualizado' : 'adicionado'}: ${membroData.nome}`);
+      console.log(
+        `✅ Membro ${editingMembro ? 'atualizado' : 'adicionado'}: ${
+          membroData.nome
+        }`
+      );
     } catch (error) {
       console.error('Erro ao salvar membro:', error);
       alert('Erro ao salvar membro. Tente novamente.');
@@ -188,20 +175,8 @@ const Hierarquia = ({ isAdmin }) => {
   const handleDeleteMembro = async (id) => {
     if (window.confirm('Tem certeza que deseja excluir este membro?')) {
       try {
-        const membroDoc = await getDoc(doc(db, 'hierarquia', id));
-        const membroData = membroDoc.data();
-
-        if (!membroData) {
-          throw new Error('Membro não encontrado');
-        }
-
-        if (membroData?.discordMessageId) {
-          await deleteDiscordMessage('hierarquia', {
-            ...membroData,
-            id: id,
-            discordMessageId: membroData.discordMessageId,
-          });
-        }
+        // ✅ NÃO CHAMAR deleteDiscordMessage AQUI!
+        // O sincronizador automático fará isso em 30 segundos
 
         await deleteDoc(doc(db, 'hierarquia', id));
 
@@ -210,7 +185,7 @@ const Hierarquia = ({ isAdmin }) => {
           setSelectedMembro(null);
         }
 
-        console.log(`🗑️ Membro removido: ${membroData?.nome}`);
+        console.log(`🗑️ Membro removido`);
       } catch (error) {
         console.error('Erro ao excluir membro:', error);
         alert('Erro ao excluir membro. Tente novamente.');
@@ -239,7 +214,7 @@ const Hierarquia = ({ isAdmin }) => {
       const membroData = membroDoc.data();
 
       const advertênciasExistentes = membroData.advertências || [];
-      
+
       const jaExiste = advertênciasExistentes.some(
         (adv) =>
           adv.tipo === novaAdvertencia.tipo &&
@@ -266,7 +241,9 @@ const Hierarquia = ({ isAdmin }) => {
         descricao: '',
       });
 
-      console.log(`📝 ${novaAdvertencia.tipo} adicionado para ${selectedMembro.nome}`);
+      console.log(
+        `📝 ${novaAdvertencia.tipo} adicionado para ${selectedMembro.nome}`
+      );
     } catch (error) {
       console.error('Erro ao salvar advertência:', error);
       alert('Erro ao salvar advertência. Tente novamente.');
@@ -324,7 +301,11 @@ const Hierarquia = ({ isAdmin }) => {
           updatedAt: new Date(),
         });
 
-        console.log(`🔄 Status alterado: ${membro.nome} → ${!membro.ativo ? 'ATIVO' : 'INATIVO'}`);
+        console.log(
+          `🔄 Status alterado: ${membro.nome} → ${
+            !membro.ativo ? 'ATIVO' : 'INATIVO'
+          }`
+        );
       } catch (error) {
         console.error('Erro ao alterar status:', error);
         alert('Erro ao alterar status. Tente novamente.');
@@ -335,8 +316,8 @@ const Hierarquia = ({ isAdmin }) => {
   const getPatenteColor = (patente) => {
     const cores = {
       'Tenente Coronel': 'text-yellow-400',
-      'Major': 'text-yellow-300',
-      'Capitão': 'text-blue-400',
+      Major: 'text-yellow-300',
+      Capitão: 'text-blue-400',
       '1° Tenente': 'text-blue-300',
       '2° Tenente': 'text-blue-200',
       'Aspirante a Oficial': 'text-purple-400',
@@ -382,7 +363,11 @@ const Hierarquia = ({ isAdmin }) => {
                     key={patente}
                     className="border-b border-gray-700 pb-4 last:border-0 fade-in"
                   >
-                    <h4 className={`font-semibold mb-2 ${getPatenteColor(patente)}`}>
+                    <h4
+                      className={`font-semibold mb-2 ${getPatenteColor(
+                        patente
+                      )}`}
+                    >
                       {patente}{' '}
                       {membrosPatente.length > 1 &&
                         `(${membrosPatente.length})`}
@@ -473,7 +458,11 @@ const Hierarquia = ({ isAdmin }) => {
                   )}
                   <div>
                     <h3 className="font-bold text-lg">{selectedMembro.nome}</h3>
-                    <p className={`font-semibold ${getPatenteColor(selectedMembro.patente)}`}>
+                    <p
+                      className={`font-semibold ${getPatenteColor(
+                        selectedMembro.patente
+                      )}`}
+                    >
                       {selectedMembro.patente}
                     </p>
                     <div className="flex items-center gap-2 mt-1">
