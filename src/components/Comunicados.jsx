@@ -34,8 +34,8 @@ import { formatContent } from './utils/markdownFormatter';
 import {
   upsertDiscordMessage,
   deleteDiscordMessage,
-  hideDiscordMessage, // ✅ NOVO
-  showDiscordMessage, // ✅ NOVO
+  hideDiscordMessage,
+  showDiscordMessage,
 } from '../utils/discordManager';
 
 const Comunicados = ({ isAdmin }) => {
@@ -182,12 +182,17 @@ const Comunicados = ({ isAdmin }) => {
     };
 
     try {
-      let discordMessageId = null;
-
       if (editingCom) {
-        // === EDIÇÃO: SOMENTE FIREBASE ===
+        // === EDIÇÃO: Firebase + Discord (edita mensagem existente) ===
         await updateDoc(doc(db, 'comunicados', editingCom.id), comunicadoData);
-        // ❌ DISCORD REMOVIDO - Edição não gera mensagem
+
+        if (editingCom.discordMessageId) {
+          await upsertDiscordMessage('comunicados', editingCom.id, {
+            ...comunicadoData,
+            id: editingCom.id,
+            discordMessageId: editingCom.discordMessageId,
+          });
+        }
       } else {
         // === CRIAÇÃO: Firebase + Discord ===
         const docRef = await addDoc(
@@ -195,7 +200,7 @@ const Comunicados = ({ isAdmin }) => {
           comunicadoData
         );
 
-        discordMessageId = await upsertDiscordMessage(
+        const discordMessageId = await upsertDiscordMessage(
           'comunicados',
           docRef.id,
           {
@@ -271,7 +276,6 @@ const Comunicados = ({ isAdmin }) => {
   // ========== OCULTAR COMUNICADO ==========
   const handleHideCom = async (com) => {
     try {
-      // ✅ Remover do Discord
       if (com.discordMessageId) {
         await hideDiscordMessage('comunicados', {
           ...com,
@@ -280,7 +284,6 @@ const Comunicados = ({ isAdmin }) => {
         });
       }
 
-      // ✅ Atualizar Firebase
       await updateDoc(doc(db, 'comunicados', com.id), {
         isActive: false,
         updatedAt: new Date(),
@@ -296,7 +299,6 @@ const Comunicados = ({ isAdmin }) => {
   // ========== MOSTRAR COMUNICADO ==========
   const handleShowCom = async (com) => {
     try {
-      // ✅ Republicar no Discord
       const discordMessageId = await showDiscordMessage('comunicados', {
         ...com,
         id: com.id,
@@ -304,7 +306,6 @@ const Comunicados = ({ isAdmin }) => {
         isUrgente: com.isUrgente,
       });
 
-      // ✅ Atualizar Firebase
       await updateDoc(doc(db, 'comunicados', com.id), {
         isActive: true,
         discordMessageId: discordMessageId || com.discordMessageId,
@@ -318,68 +319,65 @@ const Comunicados = ({ isAdmin }) => {
     }
   };
 
-  // ========== TOGGLE ATIVO ==========
-  const toggleComStatus = async (com) => {
+  // ========== TOGGLE URGENTE ==========
+  const toggleComUrgente = async (com) => {
     try {
+      const novoStatus = !com.isUrgente;
+
       await updateDoc(doc(db, 'comunicados', com.id), {
-        isActive: !com.isActive,
+        isUrgente: novoStatus,
         updatedAt: new Date(),
       });
 
       if (com.discordMessageId) {
-        await upsertDiscordMessage('comunicados', com.id, {
-          ...com,
-          isActive: !com.isActive,
-          discordMessageId: com.discordMessageId,
-        });
+        await upsertDiscordMessage(
+          'comunicados',
+          com.id,
+          {
+            ...com,
+            isUrgente: novoStatus,
+            discordMessageId: com.discordMessageId,
+          },
+          'urgente'
+        );
       }
 
       console.log(
-        `📢 Comunicado ${com.titulo} ${!com.isActive ? 'visível' : 'oculto'}`
+        `${novoStatus ? '⚠️' : '📋'} Comunicado ${
+          com.titulo
+        } - Urgente: ${novoStatus ? 'SIM' : 'NÃO'}`
       );
     } catch (error) {
-      console.error('Erro ao alterar status:', error);
-      alert('Erro ao alterar status. Tente novamente.');
+      console.error('Erro ao alterar urgência:', error);
+      alert('Erro ao alterar urgência. Tente novamente.');
     }
   };
-
-  // ========== TOGGLE URGENTE ==========
-  const toggleComUrgente = async (com) => {
-  try {
-    const novoStatus = !com.isUrgente;
-    
-    await updateDoc(doc(db, 'comunicados', com.id), {
-      isUrgente: novoStatus,
-      updatedAt: new Date(),
-    });
-
-    // ✅ ATUALIZAR DISCORD
-    if (com.discordMessageId) {
-      await upsertDiscordMessage('comunicados', com.id, {
-        ...com,
-        isUrgente: novoStatus,
-        discordMessageId: com.discordMessageId
-      }, 'urgente');  // 👈 ENVIAR COMO URGENTE
-    }
-
-    console.log(`${novoStatus ? '⚠️' : '📋'} Comunicado ${com.titulo} - Urgente: ${novoStatus ? 'SIM' : 'NÃO'}`);
-  } catch (error) {
-    console.error('Erro ao alterar urgência:', error);
-    alert('Erro ao alterar urgência. Tente novamente.');
-  }
-};
 
   // ========== FORMATAR DATA ==========
   const formatDate = (date) => {
     if (!date) return 'Data desconhecida';
-    const d = date.seconds ? new Date(date.seconds * 1000) : new Date(date);
-    return d.toLocaleDateString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    try {
+      // Se for Firestore Timestamp
+      if (date?.toDate) return date.toDate().toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+      // Se for string ISO ou Date
+      const d = new Date(date);
+      if (isNaN(d.getTime())) return 'Data inválida';
+      return d.toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch {
+      return 'Data inválida';
+    }
   };
 
   // ========== OBTER INFO DO TIPO ==========
@@ -593,8 +591,7 @@ const Comunicados = ({ isAdmin }) => {
                     className="w-full bg-gray-900 border border-blue-500/20 rounded-lg p-3 text-white outline-none focus:border-blue-500 resize-none font-mono text-sm"
                   />
                   <div className="text-xs text-gray-500 mt-1">
-                    Dica: Use **negrito**, *itálico*, # Título, ## Subtítulo, -
-                    lista
+                    Dica: Use **negrito**, *itálico*, # Título, ## Subtítulo, - lista
                   </div>
                 </div>
 
@@ -665,16 +662,13 @@ const Comunicados = ({ isAdmin }) => {
           comunicados.map((com) => {
             const tipoInfo = getTipoInfo(com.tipo);
             const isExpanded = expandedComId === com.id;
-            const hasLongContent = com.conteudo?.length > 200;
 
             return (
               <div
                 key={com.id}
                 className={`
                   bg-gray-800/50 border rounded-xl overflow-hidden transition
-                  ${
-                    !com.isActive && isAdmin ? 'border-gray-700 opacity-60' : ''
-                  }
+                  ${!com.isActive && isAdmin ? 'border-gray-700 opacity-60' : ''}
                   ${
                     com.isUrgente
                       ? 'border-red-500/50 bg-red-900/10'
@@ -708,8 +702,7 @@ const Comunicados = ({ isAdmin }) => {
                         </p>
                         {com.discordMessageId && (
                           <p className="text-xs text-gray-500 mt-1">
-                            🟢 Discord ID:{' '}
-                            {com.discordMessageId.substring(0, 8)}...
+                            🟢 Discord ID: {com.discordMessageId.substring(0, 8)}...
                           </p>
                         )}
                       </div>
@@ -744,6 +737,28 @@ const Comunicados = ({ isAdmin }) => {
                       }}
                     />
 
+                    {/* 🔗 LINK DIRETO - GRANDE E VISÍVEL */}
+                    <div className="mt-6 p-4 bg-gray-800 rounded-lg border border-blue-500/40">
+                      <a
+                        href={`https://forca-tatica.vercel.app/comunicados?id=${com.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-3 text-blue-400 hover:text-blue-300 transition group"
+                      >
+                        <div className="bg-blue-500/20 p-3 rounded-lg group-hover:bg-blue-500/30">
+                          <LinkIcon size={20} />
+                        </div>
+                        <div className="flex-1">
+                          <span className="text-sm font-bold block">
+                            🔗 LINK DIRETO PARA ESTE COMUNICADO
+                          </span>
+                          <span className="text-xs text-gray-400 font-mono break-all">
+                            https://forca-tatica.vercel.app/comunicados?id={com.id}
+                          </span>
+                        </div>
+                        <ChevronUp size={20} className="rotate-45 group-hover:translate-x-1 group-hover:-translate-y-1 transition" />
+                      </a>
+                    </div>
 
                     {/* Ações administrativas */}
                     {isAdmin && (
@@ -757,14 +772,14 @@ const Comunicados = ({ isAdmin }) => {
 
                         {com.isActive ? (
                           <button
-                            onClick={() => handleHideCom(com)} // ✅ NOVO
+                            onClick={() => handleHideCom(com)}
                             className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2 rounded text-sm flex items-center justify-center gap-1 transition"
                           >
                             <EyeOff size={14} /> Ocultar
                           </button>
                         ) : (
                           <button
-                            onClick={() => handleShowCom(com)} // ✅ NOVO
+                            onClick={() => handleShowCom(com)}
                             className="flex-1 bg-green-600/20 hover:bg-green-600/30 text-green-400 py-2 rounded text-sm flex items-center justify-center gap-1 transition"
                           >
                             <Eye size={14} /> Mostrar
