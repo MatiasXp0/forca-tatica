@@ -83,6 +83,7 @@ const Hierarquia = ({ isAdmin }) => {
     return () => pararSyncHierarquia();
   }, []);
 
+  // Buscar membros em tempo real
   useEffect(() => {
     const q = query(collection(db, 'hierarquia'), orderBy('patente'));
     return onSnapshot(q, (snap) => {
@@ -94,6 +95,16 @@ const Hierarquia = ({ isAdmin }) => {
       setMembros(membrosData);
     });
   }, []);
+
+  // ✅ Atualizar o membro selecionado quando os dados dele mudarem
+  useEffect(() => {
+    if (selectedMembro) {
+      const membroAtualizado = membros.find((m) => m.id === selectedMembro.id);
+      if (membroAtualizado) {
+        setSelectedMembro(membroAtualizado);
+      }
+    }
+  }, [membros, selectedMembro?.id]);
 
   // ESC para fechar modais
   useEffect(() => {
@@ -127,6 +138,7 @@ const Hierarquia = ({ isAdmin }) => {
     return () => window.removeEventListener('keydown', handleEsc);
   }, [isModalOpen, isAdvertenciaModalOpen]);
 
+  // ========== SALVAR MEMBRO (CRIAR/EDITAR) ==========
   const handleSaveMembro = async () => {
     if (!formData.nome || !formData.patente) {
       alert('Preencha nome e patente!');
@@ -147,9 +159,6 @@ const Hierarquia = ({ isAdmin }) => {
       } else {
         await addDoc(collection(db, 'hierarquia'), membroData);
       }
-
-      // ✅ NÃO CHAMAR upsertDiscordMessage AQUI!
-      // O sincronizador automático fará isso em 30 segundos
 
       setModalOpen(false);
       setEditingMembro(null);
@@ -172,19 +181,15 @@ const Hierarquia = ({ isAdmin }) => {
     }
   };
 
+  // ========== DELETAR MEMBRO ==========
   const handleDeleteMembro = async (id) => {
     if (window.confirm('Tem certeza que deseja excluir este membro?')) {
       try {
-        // ✅ NÃO CHAMAR deleteDiscordMessage AQUI!
-        // O sincronizador automático fará isso em 30 segundos
-
         await deleteDoc(doc(db, 'hierarquia', id));
-
         setMembros((prev) => prev.filter((m) => m.id !== id));
         if (selectedMembro?.id === id) {
           setSelectedMembro(null);
         }
-
         console.log(`🗑️ Membro removido`);
       } catch (error) {
         console.error('Erro ao excluir membro:', error);
@@ -193,6 +198,7 @@ const Hierarquia = ({ isAdmin }) => {
     }
   };
 
+  // ========== SALVAR EVENTO (ADVERTÊNCIA/ELOGIO/AUSÊNCIA) ==========
   const handleSaveAdvertencia = async () => {
     if (!selectedMembro || !advertenciaForm.motivo || advertenciaSubmitting) {
       alert('Preencha o motivo!');
@@ -201,7 +207,7 @@ const Hierarquia = ({ isAdmin }) => {
 
     setAdvertenciaSubmitting(true);
 
-    const novaAdvertencia = {
+    const novoEvento = {
       ...advertenciaForm,
       id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       createdAt: new Date(),
@@ -213,13 +219,14 @@ const Hierarquia = ({ isAdmin }) => {
       const membroDoc = await getDoc(membroRef);
       const membroData = membroDoc.data();
 
-      const advertênciasExistentes = membroData.advertências || [];
+      const eventosExistentes = membroData.advertências || [];
 
-      const jaExiste = advertênciasExistentes.some(
+      // Evitar duplicatas (opcional)
+      const jaExiste = eventosExistentes.some(
         (adv) =>
-          adv.tipo === novaAdvertencia.tipo &&
-          adv.motivo === novaAdvertencia.motivo &&
-          adv.dataInicio === novaAdvertencia.dataInicio
+          adv.tipo === novoEvento.tipo &&
+          adv.motivo === novoEvento.motivo &&
+          adv.dataInicio === novoEvento.dataInicio
       );
 
       if (jaExiste) {
@@ -229,7 +236,7 @@ const Hierarquia = ({ isAdmin }) => {
       }
 
       await updateDoc(membroRef, {
-        advertências: [...advertênciasExistentes, novaAdvertencia],
+        advertências: [...eventosExistentes, novoEvento],
       });
 
       setAdvertenciaModalOpen(false);
@@ -241,42 +248,42 @@ const Hierarquia = ({ isAdmin }) => {
         descricao: '',
       });
 
-      console.log(
-        `📝 ${novaAdvertencia.tipo} adicionado para ${selectedMembro.nome}`
-      );
+      console.log(`📝 ${novoEvento.tipo} adicionado para ${selectedMembro.nome}`);
     } catch (error) {
-      console.error('Erro ao salvar advertência:', error);
-      alert('Erro ao salvar advertência. Tente novamente.');
+      console.error('Erro ao salvar registro:', error);
+      alert('Erro ao salvar registro. Tente novamente.');
     } finally {
       setAdvertenciaSubmitting(false);
     }
   };
 
-  const handleDeleteAdvertencia = async (advertenciaId) => {
+  // ========== DELETAR EVENTO ==========
+  const handleDeleteAdvertencia = async (eventoId) => {
     if (!selectedMembro) return;
 
-    if (window.confirm('Tem certeza que deseja excluir esta advertência?')) {
+    if (window.confirm('Tem certeza que deseja excluir este registro?')) {
       try {
         const membroRef = doc(db, 'hierarquia', selectedMembro.id);
         const membroDoc = await getDoc(membroRef);
         const membroData = membroDoc.data();
 
-        const novasAdvertencias = membroData.advertências.filter(
-          (a) => a.id !== advertenciaId
+        const novosEventos = membroData.advertências.filter(
+          (a) => a.id !== eventoId
         );
 
         await updateDoc(membroRef, {
-          advertências: novasAdvertencias,
+          advertências: novosEventos,
         });
 
         console.log(`🗑️ Registro removido de ${selectedMembro.nome}`);
       } catch (error) {
-        console.error('Erro ao excluir advertência:', error);
-        alert('Erro ao excluir advertência. Tente novamente.');
+        console.error('Erro ao excluir registro:', error);
+        alert('Erro ao excluir registro. Tente novamente.');
       }
     }
   };
 
+  // ========== EDITAR MEMBRO (ABRE MODAL) ==========
   const handleEditMembro = (membro) => {
     setEditingMembro(membro);
     setFormData({
@@ -289,10 +296,12 @@ const Hierarquia = ({ isAdmin }) => {
     setModalOpen(true);
   };
 
+  // ========== SELECIONAR MEMBRO ==========
   const handleViewMembro = (membro) => {
     setSelectedMembro(membro);
   };
 
+  // ========== TOGGLE STATUS (ATIVO/INATIVO) ==========
   const handleToggleStatus = async (membro) => {
     if (window.confirm(`Alterar status de ${membro.nome}?`)) {
       try {
@@ -313,6 +322,7 @@ const Hierarquia = ({ isAdmin }) => {
     }
   };
 
+  // ========== COR DA PATENTE ==========
   const getPatenteColor = (patente) => {
     const cores = {
       'Tenente Coronel': 'text-yellow-400',
@@ -485,7 +495,7 @@ const Hierarquia = ({ isAdmin }) => {
                   </div>
                 </div>
 
-                {/* Advertências */}
+                {/* Registros */}
                 <div className="mb-6">
                   <div className="flex justify-between items-center mb-3">
                     <h4 className="font-semibold text-gray-300">Registros</h4>
@@ -501,60 +511,66 @@ const Hierarquia = ({ isAdmin }) => {
                   <div className="space-y-3">
                     {selectedMembro.advertências &&
                     selectedMembro.advertências.length > 0 ? (
-                      selectedMembro.advertências.map((adv) => (
-                        <div
-                          key={adv.id}
-                          className={`p-3 rounded-lg ${getAdvertenciaColor(
-                            adv.tipo
-                          )} fade-in`}
-                        >
-                          <div className="flex justify-between items-start mb-2">
-                            <div className="flex items-center gap-2">
-                              {adv.tipo === 'ausencia' && (
-                                <Calendar size={14} />
+                      [...selectedMembro.advertências]
+                        .sort((a, b) => {
+                          const dateA = a.createdAt?.seconds || new Date(a.createdAt).getTime();
+                          const dateB = b.createdAt?.seconds || new Date(b.createdAt).getTime();
+                          return dateB - dateA;
+                        })
+                        .map((adv) => (
+                          <div
+                            key={adv.id}
+                            className={`p-3 rounded-lg ${getAdvertenciaColor(
+                              adv.tipo
+                            )} fade-in`}
+                          >
+                            <div className="flex justify-between items-start mb-2">
+                              <div className="flex items-center gap-2">
+                                {adv.tipo === 'ausencia' && (
+                                  <Calendar size={14} />
+                                )}
+                                {adv.tipo === 'advertencia' && (
+                                  <AlertCircle size={14} />
+                                )}
+                                {adv.tipo === 'elogio' && <Award size={14} />}
+                                <span className="font-semibold capitalize">
+                                  {adv.tipo}
+                                </span>
+                              </div>
+                              {isAdmin && (
+                                <button
+                                  onClick={() => handleDeleteAdvertencia(adv.id)}
+                                  className="text-red-400 hover:text-red-300 transition"
+                                  title="Excluir"
+                                  type="button"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
                               )}
-                              {adv.tipo === 'advertencia' && (
-                                <AlertCircle size={14} />
-                              )}
-                              {adv.tipo === 'elogio' && <Award size={14} />}
-                              <span className="font-semibold capitalize">
-                                {adv.tipo}
-                              </span>
                             </div>
-                            {isAdmin && (
-                              <button
-                                onClick={() => handleDeleteAdvertencia(adv.id)}
-                                className="text-red-400 hover:text-red-300 transition"
-                                title="Excluir"
-                                type="button"
-                              >
-                                <Trash2 size={14} />
-                              </button>
+                            <p className="text-sm mb-1">
+                              <strong>Motivo:</strong> {adv.motivo}
+                            </p>
+                            <p className="text-sm mb-1">
+                              <strong>Período:</strong> {adv.dataInicio}
+                              {adv.dataFim && ` até ${adv.dataFim}`}
+                            </p>
+                            {adv.descricao && (
+                              <p className="text-sm mt-2">{adv.descricao}</p>
                             )}
+                            <p className="text-xs text-gray-400 mt-2">
+                              {adv.createdAt?.seconds
+                                ? new Date(
+                                    adv.createdAt.seconds * 1000
+                                  ).toLocaleDateString('pt-BR')
+                                : adv.createdAt
+                                ? new Date(adv.createdAt).toLocaleDateString(
+                                    'pt-BR'
+                                  )
+                                : new Date().toLocaleDateString('pt-BR')}
+                            </p>
                           </div>
-                          <p className="text-sm mb-1">
-                            <strong>Motivo:</strong> {adv.motivo}
-                          </p>
-                          <p className="text-sm mb-1">
-                            <strong>Período:</strong> {adv.dataInicio}
-                            {adv.dataFim && ` até ${adv.dataFim}`}
-                          </p>
-                          {adv.descricao && (
-                            <p className="text-sm mt-2">{adv.descricao}</p>
-                          )}
-                          <p className="text-xs text-gray-400 mt-2">
-                            {adv.createdAt?.seconds
-                              ? new Date(
-                                  adv.createdAt.seconds * 1000
-                                ).toLocaleDateString('pt-BR')
-                              : adv.createdAt
-                              ? new Date(adv.createdAt).toLocaleDateString(
-                                  'pt-BR'
-                                )
-                              : new Date().toLocaleDateString('pt-BR')}
-                          </p>
-                        </div>
-                      ))
+                        ))
                     ) : (
                       <p className="text-gray-500 text-sm text-center py-4">
                         Nenhum registro encontrado
@@ -563,7 +579,7 @@ const Hierarquia = ({ isAdmin }) => {
                   </div>
                 </div>
 
-                {/* Observações */}
+                {/* Observações Internas */}
                 {isAdmin && (
                   <div className="mb-6">
                     <h4 className="font-semibold text-gray-300 mb-2">
