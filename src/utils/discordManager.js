@@ -94,33 +94,36 @@ class DiscordManager {
           description += `└ ⚠️ **INATIVO**\n`;
         }
 
-        // ✅ LISTAR TODOS OS EVENTOS, não apenas o último
-        if (m.advertências?.length > 0) {
-          // Ordena por data (mais recente primeiro) e limita a 3 para não poluir
-          const eventos = [...m.advertências]
-            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-            .slice(0, 3);
+        // === LISTAR TODOS OS EVENTOS (COM DATA DE INÍCIO E DATA DE FIM) ===
+        if (m.advertências && m.advertências.length > 0) {
+          // Ordena do mais recente para o mais antigo
+          const eventosOrdenados = [...m.advertências].sort((a, b) => {
+            const dateA =
+              a.createdAt?.seconds || new Date(a.createdAt).getTime();
+            const dateB =
+              b.createdAt?.seconds || new Date(b.createdAt).getTime();
+            return dateB - dateA;
+          });
 
-          eventos.forEach((evento) => {
-            const data =
-              evento.dataInicio?.split('-').reverse().join('/') || 'N/I';
-            const motivo = evento.motivo?.substring(0, 25) || '';
-            const motivoTruncado = motivo.length > 25 ? motivo + '…' : motivo;
-
-            // Emoji conforme o tipo
-            let emoji = '📌'; // fallback
+          eventosOrdenados.forEach((evento) => {
+            // Define emoji conforme o tipo
+            let emoji = '📝';
             if (evento.tipo === 'advertencia') emoji = '⚠️';
             else if (evento.tipo === 'elogio') emoji = '🎖️';
             else if (evento.tipo === 'ausencia') emoji = '📅';
 
-            description += `└ ${emoji} ${evento.tipo}: ${motivoTruncado} (${data})\n`;
-          });
+            // Formata datas
+            const dataInicio =
+              evento.dataInicio?.split('-').reverse().join('/') || 'N/I';
+            const dataFim = evento.dataFim
+              ? ` até ${evento.dataFim.split('-').reverse().join('/')}`
+              : '';
+            const motivo = evento.motivo?.substring(0, 40) || '';
 
-          if (m.advertências.length > 3) {
-            description += `└ ... e mais ${
-              m.advertências.length - 3
-            } registro(s)\n`;
-          }
+            description += `└ ${emoji} **${evento.tipo}**: ${motivo}${
+              motivo.length > 40 ? '…' : ''
+            } (${dataInicio}${dataFim})\n`;
+          });
         }
       });
       description += '\n';
