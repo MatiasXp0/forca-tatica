@@ -1,6 +1,9 @@
 // src/utils/discordManager.js
 // SISTEMA COMPLETO DE INTEGRAÇÃO COM DISCORD VIA WEBHOOKS
-// CORREÇÕES: Fardamentos (edição atualiza) e Comunicados (urgência atualiza)
+// CORREÇÕES: 
+// - Comunicados: edição atualiza mensagem, data corrigida, urgência via edit
+// - Viaturas: edição atualiza mensagem
+// - Hierarquia: lista todos os eventos, emojis corretos
 
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
@@ -50,7 +53,7 @@ class DiscordManager {
     console.log('✅ Discord Manager inicializado');
   }
 
-  // ========== HIERARQUIA - LISTA COMPLETA ==========
+  // ========== HIERARQUIA - LISTA COMPLETA (CORRIGIDA) ==========
   async syncHierarquiaLista(membros) {
     const webhookUrl = this.webhooks.hierarquia;
     if (!webhookUrl) {
@@ -91,19 +94,37 @@ class DiscordManager {
           description += `└ ⚠️ **INATIVO**\n`;
         }
 
+        // ✅ LISTAR TODOS OS EVENTOS, não apenas o último
         if (m.advertências?.length > 0) {
-          const ultima = m.advertências[m.advertências.length - 1];
-          const data =
-            ultima.dataInicio?.split('-').reverse().join('/') || 'N/I';
-          const motivo = ultima.motivo?.substring(0, 30) || '';
-          description += `└ 🕐 ${ultima.tipo}: ${motivo}${
-            motivo.length > 30 ? '...' : ''
-          } (${data})\n`;
+          // Ordena por data (mais recente primeiro) e limita a 3 para não poluir
+          const eventos = [...m.advertências]
+            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+            .slice(0, 3);
+
+          eventos.forEach((evento) => {
+            const data =
+              evento.dataInicio?.split('-').reverse().join('/') || 'N/I';
+            const motivo = evento.motivo?.substring(0, 25) || '';
+            const motivoTruncado = motivo.length > 25 ? motivo + '…' : motivo;
+
+            // Emoji conforme o tipo
+            let emoji = '📌'; // fallback
+            if (evento.tipo === 'advertencia') emoji = '⚠️';
+            else if (evento.tipo === 'elogio') emoji = '🎖️';
+            else if (evento.tipo === 'ausencia') emoji = '📅';
+
+            description += `└ ${emoji} ${evento.tipo}: ${motivoTruncado} (${data})\n`;
+          });
+
+          if (m.advertências.length > 3) {
+            description += `└ ... e mais ${m.advertências.length - 3} registro(s)\n`;
+          }
         }
       });
       description += '\n';
     });
 
+    // Limitar tamanho (Discord: 4096 caracteres)
     if (description.length > 4000) {
       description =
         description.substring(0, 3990) + '...\n\n*(Lista truncada)*';
@@ -162,7 +183,7 @@ class DiscordManager {
     }
   }
 
-  // ========== VIATURAS ==========
+  // ========== VIATURAS (COM EDIÇÃO CORRIGIDA) ==========
   async syncViatura(viatura, action = 'upsert') {
     const webhookUrl = this.webhooks.viaturas;
     if (!webhookUrl) {
@@ -174,60 +195,36 @@ class DiscordManager {
     const url = `https://forca-tatica.vercel.app/viaturas`;
 
     try {
+      // 1. EXCLUSÃO
       if (isDelete) {
         if (viatura.discordMessageId) {
           await this._deleteMessage(webhookUrl, viatura.discordMessageId);
-          this._log(
-            'success',
-            `🗑️ Viatura removida do Discord: ${viatura.nome}`
-          );
+          this._log('success', `🗑️ Viatura removida do Discord: ${viatura.nome}`);
         }
         return true;
       }
 
-      // SÓ CRIAÇÃO - EDIÇÃO NÃO GERA MENSAGEM (conforme solicitado)
-      if (!isDelete && !viatura.discordMessageId) {
-        const embed = {
-          title: `🚗 NOVA VIATURA: ${viatura.nome}`,
-          description:
-            viatura.descricao || 'Viatura operacional da Força Tática',
-          color: 0x3498db,
-          fields: [
-            {
-              name: '📋 MODELO',
-              value: viatura.modelo || 'Não informado',
-              inline: true,
-            },
-            {
-              name: '⚡ VELOCIDADE',
-              value: viatura.velocidadeMax
-                ? `${viatura.velocidadeMax} km/h`
-                : 'N/I',
-              inline: true,
-            },
-            {
-              name: '🔗 ACESSO RÁPIDO',
-              value: `[🔍 Ver todas as viaturas](${url})`,
-              inline: false,
-            },
-          ],
-          timestamp: new Date().toISOString(),
-          footer: {
-            text: 'Força Tática PMESP',
-            icon_url: 'https://forca-tatica.vercel.app/favicon.ico',
-          },
-        };
-
-        if (viatura.fotoURL) {
-          embed.image = { url: viatura.fotoURL };
-          embed.thumbnail = { url: viatura.fotoURL };
-        }
-
-        const messageId = await this._sendMessage(webhookUrl, embed);
-        this._log(
-          'success',
-          `✅ Viatura publicada no Discord: ${viatura.nome}`
+      // 2. EDIÇÃO (já tem ID) → ATUALIZA a mensagem existente
+      if (viatura.discordMessageId) {
+        const embed = this._createViaturaEmbed(viatura);
+        const updated = await this._editMessage(
+          webhookUrl,
+          viatura.discordMessageId,
+          embed
         );
+        if (updated) {
+          this._log('success', `✏️ Viatura atualizada no Discord: ${viatura.nome}`);
+          return viatura.discordMessageId;
+        } else {
+          this._log('warning', `⚠️ Falha ao editar viatura, tentando criar nova...`);
+        }
+      }
+
+      // 3. CRIAÇÃO (não tem ID)
+      if (!viatura.discordMessageId) {
+        const embed = this._createViaturaEmbed(viatura);
+        const messageId = await this._sendMessage(webhookUrl, embed);
+        this._log('success', `✅ Viatura publicada no Discord: ${viatura.nome}`);
         return messageId;
       }
 
@@ -238,45 +235,73 @@ class DiscordManager {
     }
   }
 
+  // ========== EMBED DE VIATURA (COMPARTILHADO) ==========
+  _createViaturaEmbed(viatura) {
+    const url = `https://forca-tatica.vercel.app/viaturas`;
+
+    const embed = {
+      title: `🚗 ${viatura.discordMessageId ? 'VIATURA ATUALIZADA' : 'NOVA VIATURA'}: ${viatura.nome}`,
+      description: viatura.descricao || 'Viatura operacional da Força Tática',
+      color: 0x3498db,
+      fields: [
+        {
+          name: '📋 MODELO',
+          value: viatura.modelo || 'Não informado',
+          inline: true,
+        },
+        {
+          name: '⚡ VELOCIDADE',
+          value: viatura.velocidadeMax ? `${viatura.velocidadeMax} km/h` : 'N/I',
+          inline: true,
+        },
+        {
+          name: '🔗 ACESSO RÁPIDO',
+          value: `[🔍 Ver todas as viaturas](${url})`,
+          inline: false,
+        },
+      ],
+      timestamp: new Date().toISOString(),
+      footer: {
+        text: 'Força Tática PMESP',
+        icon_url: 'https://forca-tatica.vercel.app/favicon.ico',
+      },
+    };
+
+    if (viatura.fotoURL) {
+      embed.image = { url: viatura.fotoURL };
+      embed.thumbnail = { url: viatura.fotoURL };
+    }
+
+    return embed;
+  }
+
   // ========== FARDAMENTOS ==========
-  // ========== EMBED DE FARDAMENTO (COM TEXTURA, DESCRIÇÃO E DIVISÃO AUTOMÁTICA) ==========
   _createFardamentoEmbed(fardamento) {
     const url = `https://forca-tatica.vercel.app/fardamento`;
 
-    // --- Monta a lista de peças com TODAS as informações ---
     let pecasTexto = '';
     if (fardamento.pecas && fardamento.pecas.length > 0) {
       pecasTexto = fardamento.pecas
         .map((p, i) => {
-          // 1) Caso a peça seja uma STRING (dados antigos)
           if (typeof p === 'string') {
             const partes = p.split('|').map((s) => s.trim());
-            const principal = partes[0] || ''; // Ex: "MASCARA 273"
-
-            // Extrai textura (TXT 272) se existir
+            const principal = partes[0] || '';
             const texturaMatch =
               p.match(/txt\s*(\d+)/i) || p.match(/textura\s*(\d+)/i);
             const textura = texturaMatch ? ` · TXT ${texturaMatch[1]}` : '';
-
-            // O resto é descrição (junta tudo que sobrou)
             const descricao = partes.slice(1).join(' | ').trim();
             const descricaoFormatada = descricao ? ` — ${descricao}` : '';
-
             return `${i + 1}. ${principal}${textura}${descricaoFormatada}`;
           }
-
-          // 2) Caso a peça seja um OBJETO (formato atual)
           const tipo = p.tipo?.toUpperCase() || '';
           const numero = p.numero || '';
           const textura = p.textura ? ` · TXT ${p.textura}` : '';
           const descricao = p.descricao ? ` — ${p.descricao}` : '';
-
           return `${i + 1}. ${tipo} ${numero}${textura}${descricao}`;
         })
         .join('\n');
     }
 
-    // --- Embed base ---
     const embed = {
       title: `👕 ${
         fardamento.discordMessageId
@@ -304,10 +329,8 @@ class DiscordManager {
       },
     };
 
-    // --- Divisão automática da lista de peças em múltiplos fields (respeita limite de 1024 caracteres) ---
     if (pecasTexto) {
       const MAX_FIELD_VALUE = 1024;
-
       const dividirTexto = (texto, tamanho) => {
         const partes = [];
         for (let i = 0; i < texto.length; i += tamanho) {
@@ -315,9 +338,7 @@ class DiscordManager {
         }
         return partes;
       };
-
       const partes = dividirTexto(pecasTexto, MAX_FIELD_VALUE);
-
       partes.forEach((parte, index) => {
         embed.fields.push({
           name: `📋 COMPOSIÇÃO ${
@@ -329,7 +350,6 @@ class DiscordManager {
       });
     }
 
-    // --- Foto (se houver) ---
     if (fardamento.fotoURL) {
       embed.image = { url: fardamento.fotoURL };
       embed.thumbnail = { url: fardamento.fotoURL };
@@ -348,19 +368,14 @@ class DiscordManager {
     const isDelete = action === 'delete';
 
     try {
-      // 1. EXCLUSÃO
       if (isDelete) {
         if (fardamento.discordMessageId) {
           await this._deleteMessage(webhookUrl, fardamento.discordMessageId);
-          this._log(
-            'success',
-            `🗑️ Fardamento removido do Discord: ${fardamento.nome}`
-          );
+          this._log('success', `🗑️ Fardamento removido do Discord: ${fardamento.nome}`);
         }
         return true;
       }
 
-      // 2. EDIÇÃO (já tem ID) → ATUALIZA a mensagem existente
       if (fardamento.discordMessageId) {
         const embed = this._createFardamentoEmbed(fardamento);
         const updated = await this._editMessage(
@@ -369,28 +384,17 @@ class DiscordManager {
           embed
         );
         if (updated) {
-          this._log(
-            'success',
-            `✏️ Fardamento atualizado no Discord: ${fardamento.nome}`
-          );
+          this._log('success', `✏️ Fardamento atualizado no Discord: ${fardamento.nome}`);
           return fardamento.discordMessageId;
         } else {
-          // Se falhou a edição, tenta criar nova (fallback)
-          this._log(
-            'warning',
-            `⚠️ Falha ao editar fardamento, criando nova mensagem...`
-          );
+          this._log('warning', `⚠️ Falha ao editar fardamento, criando nova mensagem...`);
         }
       }
 
-      // 3. CRIAÇÃO (não tem ID)
       if (!fardamento.discordMessageId) {
         const embed = this._createFardamentoEmbed(fardamento);
         const messageId = await this._sendMessage(webhookUrl, embed);
-        this._log(
-          'success',
-          `✅ Fardamento publicado no Discord: ${fardamento.nome}`
-        );
+        this._log('success', `✅ Fardamento publicado no Discord: ${fardamento.nome}`);
         return messageId;
       }
 
@@ -401,7 +405,7 @@ class DiscordManager {
     }
   }
 
-  // ========== COMUNICADOS ==========
+  // ========== COMUNICADOS (CORRIGIDO: edição, data, urgência) ==========
   async syncComunicado(comunicado, action = 'upsert') {
     const webhookUrl = this.webhooks.comunicados;
     if (!webhookUrl) {
@@ -420,34 +424,24 @@ class DiscordManager {
       if (isDelete || isHide) {
         if (comunicado.discordMessageId) {
           await this._deleteMessage(webhookUrl, comunicado.discordMessageId);
-          this._log(
-            'success',
-            `🗑️ Comunicado removido do Discord: ${comunicado.titulo}`
-          );
+          this._log('success', `🗑️ Comunicado removido do Discord: ${comunicado.titulo}`);
         }
         return true;
       }
 
       // ATUALIZAR URGÊNCIA (edição do embed)
       if (isUrgente && comunicado.discordMessageId) {
-        const embed = this._createComunicadoEmbed(comunicado, 'upsert');
+        const embed = this._createComunicadoEmbed(comunicado);
         const updated = await this._editMessage(
           webhookUrl,
           comunicado.discordMessageId,
           embed
         );
         if (updated) {
-          this._log(
-            'success',
-            `⚠️ Urgência atualizada no Discord: ${comunicado.titulo}`
-          );
+          this._log('success', `⚠️ Urgência atualizada no Discord: ${comunicado.titulo}`);
           return comunicado.discordMessageId;
         } else {
-          this._log(
-            'warning',
-            `⚠️ Falha ao atualizar urgência, tentando recriar...`
-          );
-          // fallback: deleta e cria nova
+          this._log('warning', `⚠️ Falha ao atualizar urgência, tentando recriar...`);
           await this._deleteMessage(webhookUrl, comunicado.discordMessageId);
         }
       }
@@ -457,27 +451,36 @@ class DiscordManager {
         if (comunicado.discordMessageId) {
           await this._deleteMessage(webhookUrl, comunicado.discordMessageId);
         }
-        const embed = this._createComunicadoEmbed(comunicado, 'show');
+        const embed = this._createComunicadoEmbed(comunicado);
         const messageId = await this._sendMessage(webhookUrl, embed);
-        this._log(
-          'success',
-          `✅ Comunicado republicado no Discord: ${comunicado.titulo}`
-        );
+        this._log('success', `✅ Comunicado republicado no Discord: ${comunicado.titulo}`);
         return messageId;
+      }
+
+      // EDIÇÃO GERAL (já tem ID e não é ação específica) → ATUALIZA mensagem
+      if (comunicado.discordMessageId && !isDelete && !isHide && !isShow && !isUrgente) {
+        const embed = this._createComunicadoEmbed(comunicado);
+        const updated = await this._editMessage(
+          webhookUrl,
+          comunicado.discordMessageId,
+          embed
+        );
+        if (updated) {
+          this._log('success', `✏️ Comunicado atualizado no Discord: ${comunicado.titulo}`);
+          return comunicado.discordMessageId;
+        } else {
+          this._log('warning', `⚠️ Falha ao editar comunicado, tentando recriar...`);
+        }
       }
 
       // CRIAÇÃO (não tem ID)
       if (!comunicado.discordMessageId) {
-        const embed = this._createComunicadoEmbed(comunicado, 'upsert');
+        const embed = this._createComunicadoEmbed(comunicado);
         const messageId = await this._sendMessage(webhookUrl, embed);
-        this._log(
-          'success',
-          `✅ Comunicado publicado no Discord: ${comunicado.titulo}`
-        );
+        this._log('success', `✅ Comunicado publicado no Discord: ${comunicado.titulo}`);
         return messageId;
       }
 
-      // EDIÇÃO NÃO-URGENTE? Por enquanto, não faz nada (pode ser implementado se necessário)
       return comunicado.discordMessageId;
     } catch (error) {
       this._log('error', 'Erro ao sincronizar comunicado:', error);
@@ -485,9 +488,8 @@ class DiscordManager {
     }
   }
 
-  // ========== EMBED DE COMUNICADO ==========
-  _createComunicadoEmbed(comunicado, action = 'upsert') {
-    const isShow = action === 'show';
+  // ========== EMBED DE COMUNICADO (CORRIGIDO: DATA, TÍTULO, URGÊNCIA) ==========
+  _createComunicadoEmbed(comunicado) {
     const url = `https://forca-tatica.vercel.app`;
 
     const cores = {
@@ -503,6 +505,35 @@ class DiscordManager {
       titulo = `⚠️⚠️ URGENTE: ${comunicado.titulo} ⚠️⚠️`;
     }
 
+    // ✅ CORREÇÃO DA DATA (Firestore Timestamp)
+    let dataFormatada = 'Data inválida';
+    if (comunicado.createdAt) {
+      try {
+        // Se for Timestamp do Firestore
+        if (comunicado.createdAt.toDate) {
+          dataFormatada = comunicado.createdAt.toDate().toLocaleDateString('pt-BR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          });
+        } else {
+          // Se for string ou número
+          dataFormatada = new Date(comunicado.createdAt).toLocaleDateString('pt-BR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          });
+        }
+      } catch (e) {
+        console.warn('Erro ao formatar data do comunicado:', e);
+        dataFormatada = 'Data inválida';
+      }
+    }
+
     const embed = {
       title: titulo,
       description: comunicado.conteudo?.substring(0, 2000) || 'Sem conteúdo',
@@ -515,15 +546,7 @@ class DiscordManager {
         },
         {
           name: '📅 DATA',
-          value: comunicado.createdAt
-            ? new Date(comunicado.createdAt).toLocaleDateString('pt-BR', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-              })
-            : new Date().toLocaleDateString('pt-BR'),
+          value: dataFormatada,
           inline: true,
         },
         {
@@ -534,7 +557,7 @@ class DiscordManager {
       ],
       timestamp: new Date().toISOString(),
       footer: {
-        text: isShow ? 'Comunicado reativado' : 'Força Tática PMESP',
+        text: 'Força Tática PMESP',
         icon_url: 'https://forca-tatica.vercel.app/favicon.ico',
       },
     };
