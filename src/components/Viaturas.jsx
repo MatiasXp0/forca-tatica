@@ -77,26 +77,32 @@ export const Viaturas = ({ isAdmin }) => {
     };
 
     try {
-      let discordMessageId = null;
-
       if (editingViatura) {
-        // ✅ EDITAR: Só atualiza o Firebase (NÃO publica no Discord)
+        // ✅ EDIÇÃO: Atualiza Firebase E Discord (edita mensagem existente)
         await updateDoc(doc(db, 'viaturas', editingViatura.id), viaturaData);
+
+        // Atualiza a mensagem no Discord (se existir)
+        if (editingViatura.discordMessageId) {
+          await upsertDiscordMessage('viaturas', editingViatura.id, {
+            ...viaturaData,
+            id: editingViatura.id,
+            discordMessageId: editingViatura.discordMessageId,
+          });
+        }
+
         console.log(`✏️ Viatura atualizada: ${viaturaData.nome}`);
       } else {
-        // ✅ CRIAR: Firebase + Discord
+        // ✅ CRIAÇÃO: Firebase + Discord
         const docRef = await addDoc(collection(db, 'viaturas'), viaturaData);
-        
-        // Publicar no Discord
-        discordMessageId = await upsertDiscordMessage('viaturas', docRef.id, {
+
+        const discordMessageId = await upsertDiscordMessage('viaturas', docRef.id, {
           ...viaturaData,
-          id: docRef.id
+          id: docRef.id,
         });
-        
-        // Salvar o ID da mensagem no Firebase
+
         if (discordMessageId) {
           await updateDoc(doc(db, 'viaturas', docRef.id), {
-            discordMessageId: discordMessageId
+            discordMessageId: discordMessageId,
           });
           console.log(`✅ Viatura criada e publicada no Discord: ${viaturaData.nome}`);
         }
@@ -126,27 +132,22 @@ export const Viaturas = ({ isAdmin }) => {
   const handleDelete = async (id) => {
     if (window.confirm('Tem certeza que deseja excluir esta viatura?')) {
       try {
-        // Buscar dados da viatura
         const viaturaDoc = await getDoc(doc(db, 'viaturas', id));
         const viaturaData = viaturaDoc.data();
+        if (!viaturaData) throw new Error('Viatura não encontrada');
 
-        if (!viaturaData) {
-          throw new Error('Viatura não encontrada');
-        }
-
-        // ✅ REMOVER DO DISCORD (se tiver mensagem)
+        // ✅ REMOVER DO DISCORD
         if (viaturaData?.discordMessageId) {
           await deleteDiscordMessage('viaturas', {
             ...viaturaData,
-            id: id,
-            discordMessageId: viaturaData.discordMessageId
+            id,
+            discordMessageId: viaturaData.discordMessageId,
           });
           console.log(`🗑️ Viatura removida do Discord: ${viaturaData.nome}`);
         }
 
         // ✅ REMOVER DO FIREBASE
         await deleteDoc(doc(db, 'viaturas', id));
-        
       } catch (error) {
         console.error('Erro ao excluir viatura:', error);
         alert('Erro ao excluir viatura. Tente novamente.');
@@ -174,9 +175,7 @@ export const Viaturas = ({ isAdmin }) => {
               </label>
               <input
                 value={formData.nome}
-                onChange={(e) =>
-                  setFormData({ ...formData, nome: e.target.value })
-                }
+                onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
                 placeholder="Ex: ROTA-01"
                 className="w-full bg-gray-900 border border-blue-500/20 rounded-lg p-3 text-white outline-none focus:border-blue-500"
               />
@@ -189,9 +188,7 @@ export const Viaturas = ({ isAdmin }) => {
               </label>
               <input
                 value={formData.modelo}
-                onChange={(e) =>
-                  setFormData({ ...formData, modelo: e.target.value })
-                }
+                onChange={(e) => setFormData({ ...formData, modelo: e.target.value })}
                 placeholder="Ex: Toyota Hilux 4x4"
                 className="w-full bg-gray-900 border border-blue-500/20 rounded-lg p-3 text-white outline-none focus:border-blue-500"
               />
@@ -205,9 +202,7 @@ export const Viaturas = ({ isAdmin }) => {
               <input
                 type="number"
                 value={formData.velocidadeMax}
-                onChange={(e) =>
-                  setFormData({ ...formData, velocidadeMax: e.target.value })
-                }
+                onChange={(e) => setFormData({ ...formData, velocidadeMax: e.target.value })}
                 placeholder="Ex: 180"
                 className="w-full bg-gray-900 border border-blue-500/20 rounded-lg p-3 text-white outline-none focus:border-blue-500"
               />
@@ -220,9 +215,7 @@ export const Viaturas = ({ isAdmin }) => {
               </label>
               <input
                 value={formData.fotoURL}
-                onChange={(e) =>
-                  setFormData({ ...formData, fotoURL: e.target.value })
-                }
+                onChange={(e) => setFormData({ ...formData, fotoURL: e.target.value })}
                 placeholder="https://exemplo.com/foto-viatura.jpg"
                 className="w-full bg-gray-900 border border-blue-500/20 rounded-lg p-3 text-white outline-none focus:border-blue-500"
               />
@@ -233,7 +226,8 @@ export const Viaturas = ({ isAdmin }) => {
                     alt="Preview"
                     className="w-full h-full object-contain"
                     onError={(e) => {
-                      e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iOTYiIGhlaWdodD0iOTYiIHZpZXdCb3g9IjAgMCA5NiA5NiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iOTYiIGhlaWdodD0iOTYiIGZpbGw9IiMxRjJBM0MiLz48cGF0aCBkPSJNNDggNDhMMzIgNjRMMTYgNDhMMzIgMzJMNDggNDhaIiBmaWxsPSIjM0I4MkVGIi8+PC9zdmc+';
+                      e.target.src =
+                        'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iOTYiIGhlaWdodD0iOTYiIHZpZXdCb3g9IjAgMCA5NiA5NiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iOTYiIGhlaWdodD0iOTYiIGZpbGw9IiMxRjJBM0MiLz48cGF0aCBkPSJNNDggNDhMMzIgNjRMMTYgNDhMMzIgMzJMNDggNDhaIiBmaWxsPSIjM0I4MkVGIi8+PC9zdmc+';
                     }}
                   />
                 </div>
@@ -247,9 +241,7 @@ export const Viaturas = ({ isAdmin }) => {
               </label>
               <textarea
                 value={formData.descricao}
-                onChange={(e) =>
-                  setFormData({ ...formData, descricao: e.target.value })
-                }
+                onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
                 placeholder="Descreva a viatura, equipamentos, observações..."
                 rows={4}
                 className="w-full bg-gray-900 border border-blue-500/20 rounded-lg p-3 text-white outline-none focus:border-blue-500 resize-none"
@@ -262,7 +254,7 @@ export const Viaturas = ({ isAdmin }) => {
               onClick={handleSave}
               className="flex-1 bg-blue-600 py-3 rounded-lg font-semibold text-white hover:bg-blue-700 transition"
             >
-              <Save size={16} className="inline mr-2" /> 
+              <Save size={16} className="inline mr-2" />
               {editingViatura ? 'ATUALIZAR' : 'PUBLICAR'}
             </button>
             <button
@@ -333,27 +325,21 @@ export const Viaturas = ({ isAdmin }) => {
               <div className="p-4">
                 <div className="flex justify-between items-start mb-3">
                   <div className="flex-1">
-                    <h3 className="font-bold text-lg text-blue-300">
-                      {vtr.nome}
-                    </h3>
-                    <p className="text-gray-300 text-sm">
-                      Modelo: {vtr.modelo}
-                    </p>
+                    <h3 className="font-bold text-lg text-blue-300">{vtr.nome}</h3>
+                    <p className="text-gray-300 text-sm">Modelo: {vtr.modelo}</p>
                     {vtr.velocidadeMax && (
                       <p className="text-gray-400 text-sm mt-1">
-                        <span className="font-semibold">Velocidade Máx:</span>{' '}
-                        {vtr.velocidadeMax} km/h
+                        <span className="font-semibold">Velocidade Máx:</span> {vtr.velocidadeMax} km/h
                       </p>
                     )}
-                    
-                    {/* ID do Discord (debug) */}
+
                     {vtr.discordMessageId && (
                       <p className="text-xs text-gray-500 mt-1">
                         🟢 Discord ID: {vtr.discordMessageId.substring(0, 8)}...
                       </p>
                     )}
-                    
-                    {/* 🔗 LINK DIRETO - GRANDE E VISÍVEL */}
+
+                    {/* 🔗 LINK DIRETO */}
                     <a
                       href={`https://forca-tatica.vercel.app/viaturas?id=${vtr.id}`}
                       target="_blank"
@@ -370,17 +356,14 @@ export const Viaturas = ({ isAdmin }) => {
                   </div>
                 </div>
 
-                {/* Descrição */}
                 {vtr.descricao && (
                   <div className="mb-3 mt-2">
                     <p className="text-gray-400 text-sm">
-                      <span className="font-semibold">Descrição:</span>{' '}
-                      {vtr.descricao}
+                      <span className="font-semibold">Descrição:</span> {vtr.descricao}
                     </p>
                   </div>
                 )}
 
-                {/* Ações Admin */}
                 {isAdmin && (
                   <div className="flex gap-2 border-t border-gray-700 pt-3 mt-3">
                     <button
@@ -398,12 +381,12 @@ export const Viaturas = ({ isAdmin }) => {
                   </div>
                 )}
 
-                {/* Metadados */}
                 <div className="mt-3 text-xs text-gray-500 border-t border-gray-700/50 pt-2">
                   ID: {vtr.id.slice(-6)}
                   {vtr.updatedAt && (
                     <span className="ml-2">
-                      • Atualizado: {new Date(vtr.updatedAt?.seconds * 1000 || vtr.updatedAt).toLocaleDateString('pt-BR')}
+                      • Atualizado:{' '}
+                      {new Date(vtr.updatedAt?.seconds * 1000 || vtr.updatedAt).toLocaleDateString('pt-BR')}
                     </span>
                   )}
                 </div>
