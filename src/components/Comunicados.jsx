@@ -737,28 +737,7 @@ const Comunicados = ({ isAdmin }) => {
                       }}
                     />
 
-                    {/* 🔗 LINK DIRETO - GRANDE E VISÍVEL */}
-                    <div className="mt-6 p-4 bg-gray-800 rounded-lg border border-blue-500/40">
-                      <a
-                        href={`https://forca-tatica.vercel.app/comunicados?id=${com.id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-3 text-blue-400 hover:text-blue-300 transition group"
-                      >
-                        <div className="bg-blue-500/20 p-3 rounded-lg group-hover:bg-blue-500/30">
-                          <LinkIcon size={20} />
-                        </div>
-                        <div className="flex-1">
-                          <span className="text-sm font-bold block">
-                            🔗 LINK DIRETO PARA ESTE COMUNICADO
-                          </span>
-                          <span className="text-xs text-gray-400 font-mono break-all">
-                            https://forca-tatica.vercel.app/comunicados?id={com.id}
-                          </span>
-                        </div>
-                        <ChevronUp size={20} className="rotate-45 group-hover:translate-x-1 group-hover:-translate-y-1 transition" />
-                      </a>
-                    </div>
+                  
 
                     {/* Ações administrativas */}
                     {isAdmin && (
