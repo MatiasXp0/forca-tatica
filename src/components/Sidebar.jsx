@@ -11,9 +11,10 @@ import {
   ChevronLeft,
 } from 'lucide-react';
 
-const SidebarLink = ({ to, icon: Icon, label, collapsed }) => (
+const SidebarLink = ({ to, icon: Icon, label, collapsed, onClick }) => (
   <Link
     to={to}
+    onClick={onClick}
     className={`flex items-center gap-3 p-3 rounded-lg hover:bg-gray-700/50 transition group relative ${
       collapsed ? 'justify-center' : ''
     }`}
@@ -30,11 +31,12 @@ const SidebarLink = ({ to, icon: Icon, label, collapsed }) => (
   </Link>
 );
 
-const SidebarExternal = ({ href, icon: Icon, label, collapsed }) => (
+const SidebarExternal = ({ href, icon: Icon, label, collapsed, onClick }) => (
   <a
     href={href}
     target="_blank"
     rel="noopener noreferrer"
+    onClick={onClick}
     className={`flex items-center gap-3 p-3 rounded-lg hover:bg-purple-500/10 transition group relative ${
       collapsed ? 'justify-center' : ''
     }`}
@@ -52,6 +54,13 @@ const SidebarExternal = ({ href, icon: Icon, label, collapsed }) => (
 );
 
 export const Sidebar = ({ collapsed, toggleSidebar, user, isAdmin }) => {
+  // Função chamada ao clicar em qualquer link
+  const handleLinkClick = () => {
+    if (!collapsed) {
+      toggleSidebar(); // recolhe a sidebar se estiver expandida
+    }
+  };
+
   return (
     <aside
       className={`${
@@ -84,24 +93,28 @@ export const Sidebar = ({ collapsed, toggleSidebar, user, isAdmin }) => {
           icon={FileText}
           label="Comunicados"
           collapsed={collapsed}
+          onClick={handleLinkClick}
         />
         <SidebarLink
           to="/fardamento"
           icon={Shirt}
           label="Fardamentos"
           collapsed={collapsed}
+          onClick={handleLinkClick}
         />
         <SidebarLink
           to="/viaturas"
           icon={Car}
           label="Viaturas"
           collapsed={collapsed}
+          onClick={handleLinkClick}
         />
         <SidebarLink
           to="/hierarquia"
           icon={Users}
           label="Hierarquia"
           collapsed={collapsed}
+          onClick={handleLinkClick}
         />
 
         {/* Ferramentas externas */}
@@ -118,6 +131,7 @@ export const Sidebar = ({ collapsed, toggleSidebar, user, isAdmin }) => {
             icon={Calculator}
             label="Calculadora Penal"
             collapsed={collapsed}
+            onClick={handleLinkClick}
           />
         </div>
       </nav>
