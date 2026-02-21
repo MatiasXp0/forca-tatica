@@ -339,20 +339,6 @@ export const Viaturas = ({ isAdmin }) => {
                       </p>
                     )}
 
-                    {/* 🔗 LINK DIRETO */}
-                    <a
-                      href={`https://forca-tatica.vercel.app/viaturas?id=${vtr.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-3 w-full bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 px-4 py-2.5 rounded-lg inline-flex items-center justify-center gap-2 transition border border-blue-500/40 font-medium"
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                        <polyline points="15 3 21 3 21 9" />
-                        <line x1="10" y1="14" x2="21" y2="3" />
-                      </svg>
-                      🔗 LINK DIRETO PARA ESTA VIATURA
-                    </a>
                   </div>
                 </div>
 
